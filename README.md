@@ -14,6 +14,7 @@ Our effort relies upon implementing Diffusion Models to generate new OCT images,
 
 ## How to run
 
+`Note`: Tested only on Windows OS.
 ### Requirements
 
 * `python >= 3.8`
