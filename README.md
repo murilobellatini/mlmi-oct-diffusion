@@ -19,6 +19,7 @@ Our effort relies upon implementing Diffusion Models to generate new OCT images,
 * `python >= 3.8`
 * Python environment manager, such as `pipenv`
 * `pip >= 22.0.4`
+* `Python MPI`: Instructions [here](https://nyu-cds.github.io/python-mpi/setup/)
 
 ### Step by step
 
@@ -52,3 +53,5 @@ pip install -r requirements.txt
 ```batch
 jupyter kernelspec install-self 
 ```
+
+
