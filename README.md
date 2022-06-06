@@ -15,11 +15,18 @@ Current code is an extension of [guided-diffusion](https://github.com/openai/gui
 ### Step by step
 
 1. Clone repo locally
-2. Install dependencies
+2. Move to local repo root
+3. Initiate python environment (example for `pipenv` below)
+
+```batch
+pipenv shell
+```
+
+4. Install dependencies
 
 ```batch
 pip install -r requirements.txt
 ```
 
-3. Either run notebooks or cli commands below.
+5. Either run notebooks or cli commands below.
 
