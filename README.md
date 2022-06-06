@@ -2,7 +2,7 @@
 
 Repository for OCT Project MLMI Practical Course from Summer Semester 2022 at TUM.
 
-Current code is an extension of [guided-diffusion](https://github.com/openai/guided-diffusion), which is the first cloned repo.
+Current code is an extension of [guided-diffusion](https://github.com/openai/guided-diffusion).
 
 ## How to run
 
@@ -30,3 +30,8 @@ pip install -r requirements.txt
 
 5. Either run notebooks or cli commands below.
 
+6. Optional: For notebooks it might be required to install kernel profile. If so, it can be done with code below.
+
+```batch
+jupyter kernelspec install-self 
+```
