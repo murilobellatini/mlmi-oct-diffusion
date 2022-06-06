@@ -15,7 +15,17 @@ Current code is an extension of [guided-diffusion](https://github.com/openai/gui
 ### Step by step
 
 1. Clone repo locally
+
+```batch
+git clone https://github.com/murilobellatini/mlmi-oct-diffusion.git
+```
+
 2. Move to local repo root
+
+```batch
+cd ./mlmi-oct-diffusion
+```
+
 3. Initiate python environment (example for `pipenv` below)
 
 ```batch
@@ -29,7 +39,6 @@ pip install -r requirements.txt
 ```
 
 5. Either run notebooks or cli commands below.
-
 6. Optional: For notebooks it might be required to install kernel profile. If so, it can be done with code below.
 
 ```batch
