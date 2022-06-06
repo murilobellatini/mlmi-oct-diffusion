@@ -54,4 +54,12 @@ pip install -r requirements.txt
 jupyter kernelspec install-self 
 ```
 
+### Tip
+
+Try overfitting your first model ;) How? Take a look.
+
+1. Put around 10 image samples on the `./data/raw` folder
+2. Execute the method `guided_diffusion.src.resize_images` on that folder (without `output_dir` param)
+3. Run the `test_train.bat`
+4. Grab a cup coffee and relax ☕
 
