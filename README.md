@@ -1,8 +1,16 @@
-# MLMI Practical Course: OCT Image Generation via Diffusion Modles
+# MLMI Practical Course: OCT Image Generation via Diffusion Models
 
 Repository for OCT Project MLMI Practical Course from Summer Semester 2022 at TUM.
 
 Current code is an extension of [guided-diffusion](https://github.com/openai/guided-diffusion).
+
+## Scope of the project
+
+The project aims to build a neural network to extract meaningful features from OCT Imaging.
+
+The goal is to further use this trained model in other applications, such as automatic report generation based on images alone.
+
+Our effort relies upon implementing Diffusion Models to generate new OCT images, with the expectation that the extracted features of the neural network are good enough to make meaning of new unseen data. If this is accomplished, other downstream tasks such as the automatic report generation might be feasible with use of this neural network.  
 
 ## How to run
 
