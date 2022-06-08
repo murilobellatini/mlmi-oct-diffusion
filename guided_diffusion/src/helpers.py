@@ -1,3 +1,6 @@
+import matplotlib.pyplot as plt
+from matplotlib import figure
+import numpy as np
 from tqdm import tqdm
 from PIL import Image
 import os
@@ -59,3 +62,76 @@ def safe_makedirs(dirs:pl.Path) -> bool:
     if not os.path.exists(dirs):
         os.makedirs(dirs)
     return True
+
+
+def array2tuple(arr:np.array) -> tuple:
+    """
+    Converts array to tuple
+    """
+    return tuple(map(lambda x: tuple(x)[0], arr))
+
+def get_arange_matrix(shape:tuple) -> np.array:
+    """
+    Generates arange in matrix format (given shape)
+    """
+    return np.arange(np.prod(shape)).reshape(shape)
+
+def get_ij(ix:tuple, subplots_size=(2,3)) -> tuple:
+    """
+    Gets indexes i,j from tuple ix on subplot grid
+    """
+    arange_matrix = get_arange_matrix(subplots_size)
+    return array2tuple(np.where(ix == arange_matrix))
+
+def turn_off_axes(axes:np.array):
+    """
+    Turn offs all subplot axes
+    """
+    [axi.set_axis_off() for axi in axes.ravel()]
+    
+def render_samples(spath:pl.Path, samples2render:int=10, subplots_size=(5,2), title=None) -> figure.Figure:
+    """
+    Displays in IPython notebook the images produced by the model.
+    
+    It renders the numpy.array output by image_sample.py
+
+    Args:
+        spath (pl.Path): Path of generated .npz file
+        samples2render (int, optional): Amount of samples to render. Defaults to 10.
+        subplots_size (tuple, optional): Grid size of the output plot. Defaults to (5,2).
+        title (_type_, optional): Plot title, if None renders nothing. Defaults to None.
+
+    Returns:
+        figure.Figure: Plot with rendered samples
+    """
+    assert samples2render <= np.prod(subplots_size), f'`samples2render` ({samples2render}) does not fit `subplots_size` ({subplots_size}): {samples2render} > {np.prod(subplots_size)}'
+    
+    image_arrays = np.load(spath)["arr_0"]
+    
+    samples2render = min(image_arrays.shape[0], samples2render)
+
+    images = []
+    for i in range(samples2render):
+        img_array = image_arrays[i]
+        img = Image.fromarray(img_array)
+        images.append(img)
+
+    f, axarr = plt.subplots(
+        nrows=subplots_size[0],
+        ncols=subplots_size[1],
+        figsize=tuple(map(lambda x: 2*x, (5,2))))
+    
+    for ix, img in enumerate(images):
+        if ix > len(images):
+            break
+        i,j = get_ij(ix, subplots_size)
+        axarr[i,j].imshow(img)
+        axarr[i,j].set_title("Sample = %s" % ix)
+
+        turn_off_axes(axarr)
+        
+    if title:
+        plt.suptitle(title)
+        
+    return f
+    
