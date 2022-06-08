@@ -12,3 +12,4 @@ Pipfile
 src.egg-info
 src.egg-info\*
 launch.json
+mlmi-env/*
