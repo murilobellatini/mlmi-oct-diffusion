@@ -11,3 +11,4 @@ Pipfile
 .env
 src.egg-info
 src.egg-info\*
+launch.json
