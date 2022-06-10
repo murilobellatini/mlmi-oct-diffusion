@@ -19,7 +19,7 @@ def resize_images(input_dir: pl.Path, size: tuple, output_dir: pl.Path = None, n
         output_dir (pl.Path, optional): Path of output folder,
         if not given creates dir withing `./resized`
         size (tuple): Target (x,y) dimensions
-        new_suffix (str, optional): _description_. Defaults to '.jpg'.
+        new_suffix (str, optional): New extension for output images. Defaults to '.jpg'.
 
     Returns:
         bool: Return True if executed successfully.
