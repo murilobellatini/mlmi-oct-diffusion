@@ -136,10 +136,10 @@ def render_samples(spath: pl.Path, samples2render: int = 10, subplots_size=(5, 2
         images.append(img)
 
     f, axarr = plt.subplots(
-        nrows=subplots_size[0],
-        ncols=subplots_size[1],
+        *subplots_size,
         figsize=get_figsize(subplots_size),
-        squeeze=False
+        squeeze=False,
+        constrained_layout=True
     )
 
     for ix, img in enumerate(images):
@@ -148,9 +148,10 @@ def render_samples(spath: pl.Path, samples2render: int = 10, subplots_size=(5, 2
         i, j = get_ij(ix, subplots_size)
         axarr[i, j].imshow(img)
         axarr[i, j].set_title("Sample = %s" % ix)
-        turn_off_axes(axarr)
+
+    turn_off_axes(axarr)
 
     if title:
-        plt.suptitle(title, y=1.20)
+        plt.suptitle(title)
 
     return f
