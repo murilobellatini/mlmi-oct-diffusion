@@ -172,7 +172,6 @@ class TrainLoop:
                 self.run_step(batch, cond)
 
                 if self.step % self.log_interval == 0:
-                    logger.log('dumping diagnostics....')
                     logger.dumpkvs()
                 if self.step % self.save_interval == 0:
                     self.save()
@@ -188,7 +187,6 @@ class TrainLoop:
             self.save()
 
     def run_step(self, batch, cond):
-        logger.log('runing step....')
         self.forward_backward(batch, cond)
         took_step = self.mp_trainer.optimize(self.opt)
         if took_step:
