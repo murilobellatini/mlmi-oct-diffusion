@@ -2,6 +2,9 @@ import copy
 import functools
 import os
 
+from datetime import datetime
+from time import time
+from tqdm import tqdm
 import blobfile as bf
 import torch as th
 import torch.distributed as dist
@@ -38,6 +41,7 @@ class TrainLoop:
         schedule_sampler=None,
         weight_decay=0.0,
         lr_anneal_steps=0,
+        max_train_steps=None
     ):
         self.model = model
         self.diffusion = diffusion
@@ -58,12 +62,15 @@ class TrainLoop:
         self.schedule_sampler = schedule_sampler or UniformSampler(diffusion)
         self.weight_decay = weight_decay
         self.lr_anneal_steps = lr_anneal_steps
+        self.max_train_steps = max_train_steps
 
         self.step = 0
         self.resume_step = 0
         self.global_batch = self.batch_size * dist.get_world_size()
 
         self.sync_cuda = th.cuda.is_available()
+
+        logger.log("Is CUDA available:", self.sync_cuda)
 
         self._load_and_sync_parameters()
         self.mp_trainer = MixedPrecisionTrainer(
@@ -111,9 +118,11 @@ class TrainLoop:
         resume_checkpoint = find_resume_checkpoint() or self.resume_checkpoint
 
         if resume_checkpoint:
-            self.resume_step = parse_resume_step_from_filename(resume_checkpoint)
+            self.resume_step = parse_resume_step_from_filename(
+                resume_checkpoint)
             if dist.get_rank() == 0:
-                logger.log(f"loading model from checkpoint: {resume_checkpoint}...")
+                logger.log(
+                    f"loading model from checkpoint: {resume_checkpoint}...")
                 self.model.load_state_dict(
                     dist_util.load_state_dict(
                         resume_checkpoint, map_location=dist_util.dev()
@@ -126,14 +135,16 @@ class TrainLoop:
         ema_params = copy.deepcopy(self.mp_trainer.master_params)
 
         main_checkpoint = find_resume_checkpoint() or self.resume_checkpoint
-        ema_checkpoint = find_ema_checkpoint(main_checkpoint, self.resume_step, rate)
+        ema_checkpoint = find_ema_checkpoint(
+            main_checkpoint, self.resume_step, rate)
         if ema_checkpoint:
             if dist.get_rank() == 0:
                 logger.log(f"loading EMA from checkpoint: {ema_checkpoint}...")
                 state_dict = dist_util.load_state_dict(
                     ema_checkpoint, map_location=dist_util.dev()
                 )
-                ema_params = self.mp_trainer.state_dict_to_master_params(state_dict)
+                ema_params = self.mp_trainer.state_dict_to_master_params(
+                    state_dict)
 
         dist_util.sync_params(ema_params)
         return ema_params
@@ -144,32 +155,40 @@ class TrainLoop:
             bf.dirname(main_checkpoint), f"opt{self.resume_step:06}.pt"
         )
         if bf.exists(opt_checkpoint):
-            logger.log(f"loading optimizer state from checkpoint: {opt_checkpoint}")
+            logger.log(
+                f"loading optimizer state from checkpoint: {opt_checkpoint}")
             state_dict = dist_util.load_state_dict(
                 opt_checkpoint, map_location=dist_util.dev()
             )
             self.opt.load_state_dict(state_dict)
 
     def run_loop(self):
-        while (
-            not self.lr_anneal_steps
-            or self.step + self.resume_step < self.lr_anneal_steps
-        ):
-            batch, cond = next(self.data)
-            self.run_step(batch, cond)
-            if self.step % self.log_interval == 0:
-                logger.dumpkvs()
-            if self.step % self.save_interval == 0:
-                self.save()
-                # Run for a finite amount of time in integration tests.
-                if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0:
-                    return
-            self.step += 1
+        with tqdm(total=self.max_train_steps) as pbar:
+            while (
+                not self.lr_anneal_steps
+                or self.step + self.resume_step < self.lr_anneal_steps
+            ):
+                batch, cond = next(self.data)
+                self.run_step(batch, cond)
+
+                if self.step % self.log_interval == 0:
+                    logger.log('dumping diagnostics....')
+                    logger.dumpkvs()
+                if self.step % self.save_interval == 0:
+                    self.save()
+                    # Run for a finite amount of time in integration tests.
+                    if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0:
+                        return
+                self.step += 1
+                pbar.update(1)
+                if self.step > self.max_train_steps:
+                    break
         # Save the last checkpoint if it wasn't already saved.
         if (self.step - 1) % self.save_interval != 0:
             self.save()
 
     def run_step(self, batch, cond):
+        logger.log('runing step....')
         self.forward_backward(batch, cond)
         took_step = self.mp_trainer.optimize(self.opt)
         if took_step:
@@ -180,13 +199,14 @@ class TrainLoop:
     def forward_backward(self, batch, cond):
         self.mp_trainer.zero_grad()
         for i in range(0, batch.shape[0], self.microbatch):
-            micro = batch[i : i + self.microbatch].to(dist_util.dev())
+            micro = batch[i: i + self.microbatch].to(dist_util.dev())
             micro_cond = {
-                k: v[i : i + self.microbatch].to(dist_util.dev())
+                k: v[i: i + self.microbatch].to(dist_util.dev())
                 for k, v in cond.items()
             }
             last_batch = (i + self.microbatch) >= batch.shape[0]
-            t, weights = self.schedule_sampler.sample(micro.shape[0], dist_util.dev())
+            t, weights = self.schedule_sampler.sample(
+                micro.shape[0], dist_util.dev())
 
             compute_losses = functools.partial(
                 self.diffusion.training_losses,
@@ -226,8 +246,11 @@ class TrainLoop:
             param_group["lr"] = lr
 
     def log_step(self):
+        logger.logkv("unix_time", time())
+        logger.logkv("datetime", datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
         logger.logkv("step", self.step + self.resume_step)
-        logger.logkv("samples", (self.step + self.resume_step + 1) * self.global_batch)
+        logger.logkv("samples", (self.step + self.resume_step + 1)
+                     * self.global_batch)
 
     def save(self):
         def save_checkpoint(rate, params):
@@ -247,7 +270,8 @@ class TrainLoop:
 
         if dist.get_rank() == 0:
             with bf.BlobFile(
-                bf.join(get_blob_logdir(), f"opt{(self.step+self.resume_step):06d}.pt"),
+                bf.join(get_blob_logdir(),
+                        f"opt{(self.step+self.resume_step):06d}.pt"),
                 "wb",
             ) as f:
                 th.save(self.opt.state_dict(), f)
