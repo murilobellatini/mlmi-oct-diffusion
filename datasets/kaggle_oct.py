@@ -4,8 +4,19 @@ from tqdm import tqdm
 from hashlib import md5
 
 
-def prepare_kaggle_dataset(dataset_name='paultimothymooney/kermany2018', data_format='.jpeg', download=True, move_duplicates=True):
-    data_dir = os.path.abspath(os.getcwd() + '/data/raw/kaggle')
+def prepare_kaggle_dataset(dataset_dir='/data/raw/kaggle', dataset_name='paultimothymooney/kermany2018', data_format='.jpeg', download=True, move_duplicates=True):
+    '''
+    Downloads kaggle dataset of OCT images to dataset_dir, if download flag is set to True. Removes duplicates to ensure unique samples in dataset.
+    Input:
+        -dataset_dir: Type String - Directory where to place downloaded dataset. Default is '/data/raw/kaggle'
+        -dataset_name: Type String - Name of dataset to download from kaggle. Default is OCT Image dataset from 2017: 'paultimothymooney/kermany2018'
+        -data_format: Type String - Format of data items inside dataset to check duplicates. Default is '.jpeg' format
+        -download: Type Boolean - Flag to trigger dataset download. Default is 'True'
+        -move_duplicates: Type Boolean - Flag to print list of found duplicates to command line. Default is 'True'
+    Output:
+        Prints list of found duplicates
+    '''
+    data_dir = os.path.abspath(os.getcwd() + dataset_dir)
     if not os.path.exists(data_dir):
         os.mkdir(data_dir)
     if download:
@@ -58,9 +69,9 @@ def file_hash(filepath):
         return md5(f.read()).hexdigest()
 
 
-def main(print_duplicates=False):
+def main(print_duplicates=True):
     print('Preparing kaggle OCT image dataset')
-    duplicates = prepare_kaggle_dataset(download=False)
+    duplicates = prepare_kaggle_dataset(download=True)
     num_dupl = len(duplicates)
     print('Processing finished. {} duplicates found.'.format(num_dupl))
     if num_dupl > 0 and print_duplicates:
