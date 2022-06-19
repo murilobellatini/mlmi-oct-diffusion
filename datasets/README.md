@@ -33,3 +33,5 @@ The script kaggle_oct.py allows for the download of the dataset via CLI command 
 '''
 python kaggle_oct.py --dataset_dir --dataset_name --data_format -- download --move_duplicates
 '''
+
+Creates folder in 'data/raw/kaggle' and extracts dataset here. Duplicates are also moved to separate folder by default.
