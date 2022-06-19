@@ -28,10 +28,10 @@ This creates a directory called `lsun_train_output_dir`. This directory can be p
 
 ## Kaggle OCT Image datast
 
-The script kaggle_oct.py allows for the download of the dataset via CLI command inside the script. The dataset can be found [here](https://www.kaggle.com/datasets/paultimothymooney/kermany2018). The script also checks for duplicates via MD5 hashing and removes them from the train, val, test folders into a separate duplicates folder within the dataset. The requirements in requirements.txt should be satisfied. Default dataset folder is '/data/raw/kaggle' but can be changed by flag --dataset_dir. dataset_name, format, download and move_duplicates are also set by default.
+The script kaggle_oct.py allows for the download of the dataset via CLI command inside the script. The dataset can be found [here](https://www.kaggle.com/datasets/paultimothymooney/kermany2018). The script also checks for duplicates via MD5 hashing and removes them from the train, val, test folders into a separate duplicates folder within the dataset. The requirements in requirements.txt should be satisfied. Default dataset folder is '/data/raw/kaggle' but can be changed by flag 'dataset_dir'. 'dataset_name', 'data_format', 'download' and 'move_duplicates' are also set by default.
 
 '''
-python kaggle_oct.py --dataset_dir --dataset_name --data_format --download --move_duplicates
+python kaggle_oct.py dataset_dir dataset_name data_format download move_duplicates
 '''
 
 Creates folder in 'data/raw/kaggle' and extracts dataset here. Duplicates are also moved to separate folder by default.
