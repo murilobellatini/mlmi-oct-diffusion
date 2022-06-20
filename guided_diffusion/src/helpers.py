@@ -42,10 +42,12 @@ def resize_images(input_dir: pl.Path, size: tuple, output_dir: pl.Path = None, n
             continue
 
         if new_suffix:
-            opath.with_suffix(new_suffix)
+            opath = opath.with_suffix(new_suffix)
 
         iimg = Image.open(ipath)
         oimg = iimg.resize(size)
+        if new_suffix == '.jpg':
+            oimg = oimg.convert('RGB')
         oimg.save(opath)
 
     return True

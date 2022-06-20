@@ -2,6 +2,7 @@
 Train a diffusion model on images.
 """
 
+import json
 import argparse
 
 from guided_diffusion import dist_util, logger
@@ -23,11 +24,13 @@ def main():
     logger.configure()
 
     logger.log("creating model and diffusion...")
+    logger.log(f"loaded arguments are: {json.dumps(vars(args), indent=4)}")
     model, diffusion = create_model_and_diffusion(
         **args_to_dict(args, model_and_diffusion_defaults().keys())
     )
     model.to(dist_util.dev())
-    schedule_sampler = create_named_schedule_sampler(args.schedule_sampler, diffusion)
+    schedule_sampler = create_named_schedule_sampler(
+        args.schedule_sampler, diffusion)
 
     logger.log("creating data loader...")
     data = load_data(
@@ -54,6 +57,7 @@ def main():
         schedule_sampler=schedule_sampler,
         weight_decay=args.weight_decay,
         lr_anneal_steps=args.lr_anneal_steps,
+        max_train_steps=args.max_train_steps
     ).run_loop()
 
 
@@ -72,6 +76,7 @@ def create_argparser():
         resume_checkpoint="",
         use_fp16=False,
         fp16_scale_growth=1e-3,
+        max_train_steps=100
     )
     defaults.update(model_and_diffusion_defaults())
     parser = argparse.ArgumentParser()
