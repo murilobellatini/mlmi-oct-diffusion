@@ -180,7 +180,7 @@ class TrainLoop:
                         return
                 self.step += 1
                 pbar.update(1)
-                if self.step > self.max_train_steps:
+                if self.step >= self.max_train_steps:
                     break
         # Save the last checkpoint if it wasn't already saved.
         if (self.step - 1) % self.save_interval != 0:
