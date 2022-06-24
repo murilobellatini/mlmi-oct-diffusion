@@ -14,3 +14,5 @@ src.egg-info\*
 launch.json
 mlmi-env/*
 *sandbox.py
+/outputs/*
+/model/*
