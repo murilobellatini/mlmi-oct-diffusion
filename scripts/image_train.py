@@ -3,7 +3,7 @@ Train a diffusion model on images.
 """
 
 import json
-import argparse
+import wandb
 import yaml
 import click
 
@@ -13,29 +13,41 @@ from guided_diffusion.resample import create_named_schedule_sampler
 from guided_diffusion.script_util import (
     model_and_diffusion_defaults,
     create_model_and_diffusion,
-    args_to_dict,
-    add_dict_to_argparser,
 )
 from guided_diffusion.train_util import TrainLoop
+from scripts.image_sample import get_default_params_sample, sample_images
 
 @click.command()
-@click.argument("params", type=click.File("r"))
+@click.argument("params_file", type=click.File("r"))
 def main(params_file):
+    params_file = yaml.safe_load(params_file)
+
     params = get_default_params()
-    params.update(yaml.safe_load(params_file))
+    params.update(params_file["train"])
+    params.update(params_file["model"])
+    params.update(params_file["diffusion"])
+
+    sample_params = get_default_params_sample()
+    sample_params.update(params_file["sample"])
+    sample_params.update(params_file["model"])
+    sample_params.update(params_file["diffusion"])
+
+    wandb.login(key="f39476c0f8e0beb983d944d595be8f921ec05bfe")
+    wandb.init(project="OCT DM", entity="mlmioct22")
+    wandb.config = params
 
     dist_util.setup_dist()
-    logger.configure()
+    logger.configure(dir=params_file["train"].get("output_dir", None))
 
     logger.log("creating model and diffusion...")
-    logger.log(f"loaded arguments are: {json.dumps(vars(params), indent=4)}")
+    logger.log(f"loaded arguments are: {json.dumps(params, indent=4)}")
     
     model, diffusion = create_model_and_diffusion(
-        **params
+        **{k: params[k] for k in model_and_diffusion_defaults().keys() if k in params}
     )
     model.to(dist_util.dev())
     schedule_sampler = create_named_schedule_sampler(
-        params.schedule_sampler, diffusion
+        params["schedule_sampler"], diffusion
     )
 
     logger.log("creating data loader...")
@@ -57,6 +69,7 @@ def main(params_file):
         ema_rate=params["ema_rate"],
         log_interval=params["log_interval"],
         save_interval=params["save_interval"],
+        output_interval=params["output_interval"],
         resume_checkpoint=params["resume_checkpoint"],
         use_fp16=params["use_fp16"],
         fp16_scale_growth=params["fp16_scale_growth"],
@@ -64,7 +77,7 @@ def main(params_file):
         weight_decay=params["weight_decay"],
         lr_anneal_steps=params["lr_anneal_steps"],
         max_train_steps=params["max_train_steps"]
-    ).run_loop()
+    ).run_loop(sample_images, sample_params)
 
 
 def get_default_params():
@@ -79,6 +92,7 @@ def get_default_params():
         ema_rate="0.9999",  # comma-separated list of EMA values
         log_interval=10,
         save_interval=10000,
+        output_interval=None,
         resume_checkpoint="",
         use_fp16=False,
         fp16_scale_growth=1e-3,

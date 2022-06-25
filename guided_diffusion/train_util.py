@@ -10,6 +10,7 @@ import torch as th
 import torch.distributed as dist
 from torch.nn.parallel.distributed import DistributedDataParallel as DDP
 from torch.optim import AdamW
+import wandb
 
 from . import dist_util, logger
 from .fp16_util import MixedPrecisionTrainer
@@ -36,6 +37,7 @@ class TrainLoop:
         log_interval,
         save_interval,
         resume_checkpoint,
+        output_interval=None,
         use_fp16=False,
         fp16_scale_growth=1e-3,
         schedule_sampler=None,
@@ -57,6 +59,7 @@ class TrainLoop:
         self.log_interval = log_interval
         self.save_interval = save_interval
         self.resume_checkpoint = resume_checkpoint
+        self.output_interval = output_interval
         self.use_fp16 = use_fp16
         self.fp16_scale_growth = fp16_scale_growth
         self.schedule_sampler = schedule_sampler or UniformSampler(diffusion)
@@ -70,7 +73,10 @@ class TrainLoop:
 
         self.sync_cuda = th.cuda.is_available()
 
+        self.last_model = None
+
         logger.log("Is CUDA available:", self.sync_cuda)
+        wandb.log({"cuda": self.sync_cuda})
 
         self._load_and_sync_parameters()
         self.mp_trainer = MixedPrecisionTrainer(
@@ -111,6 +117,7 @@ class TrainLoop:
                     "Distributed training requires CUDA. "
                     "Gradients will not be synchronized properly!"
                 )
+                wandb.log(title="No CUDA Found", text= "Distributed training requires CUDA. Gradients will not be synchronized properly!", level=wandb.AlertLevel.WARN)
             self.use_ddp = False
             self.ddp_model = self.model
 
@@ -162,7 +169,7 @@ class TrainLoop:
             )
             self.opt.load_state_dict(state_dict)
 
-    def run_loop(self):
+    def run_loop(self, sampler_fn = None, sample_params = None):
         with tqdm(total=self.max_train_steps) as pbar:
             while (
                 not self.lr_anneal_steps
@@ -178,6 +185,12 @@ class TrainLoop:
                     # Run for a finite amount of time in integration tests.
                     if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0:
                         return
+                if self.output_interval is not None and self.step % self.output_interval == 0 and sampler_fn is not None and sample_params is not None and self.last_model is not None:
+                    sample_params["model_path"] = self.last_model
+                    images, _ = sampler_fn(sample_params)
+                    for i, image in enumerate(images):
+                        wandb.log({f"examples_{i}": wandb.Image(image)}, commit=False)
+                    wandb.log({}, commit=True)
                 self.step += 1
                 pbar.update(1)
                 if self.step >= self.max_train_steps:
@@ -246,6 +259,7 @@ class TrainLoop:
     def log_step(self):
         logger.logkv("unix_time", time())
         logger.logkv("datetime", datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
+        wandb.log({"step": self.step + self.resume_step, "samples": (self.step + self.resume_step + 1) * self.global_batch})
         logger.logkv("step", self.step + self.resume_step)
         logger.logkv("samples", (self.step + self.resume_step + 1)
                      * self.global_batch)
@@ -261,6 +275,8 @@ class TrainLoop:
                     filename = f"ema_{rate}_{(self.step+self.resume_step):06d}.pt"
                 with bf.BlobFile(bf.join(get_blob_logdir(), filename), "wb") as f:
                     th.save(state_dict, f)
+                    if "model" in filename:
+                        self.last_model = bf.join(get_blob_logdir(), filename)
 
         save_checkpoint(0, self.mp_trainer.master_params)
         for rate, params in zip(self.ema_rate, self.ema_params):
@@ -317,7 +333,10 @@ def find_ema_checkpoint(main_checkpoint, step, rate):
 def log_loss_dict(diffusion, ts, losses):
     for key, values in losses.items():
         logger.logkv_mean(key, values.mean().item())
+        wandb.log({key: values.mean().item()}, commit=False)
         # Log the quantiles (four quartiles, in particular).
         for sub_t, sub_loss in zip(ts.cpu().numpy(), values.detach().cpu().numpy()):
             quartile = int(4 * sub_t / diffusion.num_timesteps)
             logger.logkv_mean(f"{key}_q{quartile}", sub_loss)
+            wandb.log({f"{key}_q{quartile}": sub_loss}, commit=False)
+    wandb.log({}, commit=True)

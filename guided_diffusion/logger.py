@@ -7,6 +7,7 @@ import os
 import sys
 import shutil
 import os.path as osp
+import wandb
 import json
 import time
 import datetime
@@ -35,6 +36,7 @@ class SeqWriter(object):
 
 class HumanOutputFormat(KVWriter, SeqWriter):
     def __init__(self, filename_or_file):
+        self.filename = filename_or_file
         if isinstance(filename_or_file, str):
             self.file = open(filename_or_file, "wt")
             self.own_file = True
@@ -97,6 +99,7 @@ class HumanOutputFormat(KVWriter, SeqWriter):
 
 class JSONOutputFormat(KVWriter):
     def __init__(self, filename):
+        self.filename = filename
         self.file = open(filename, "wt")
 
     def writekvs(self, kvs):
@@ -112,6 +115,7 @@ class JSONOutputFormat(KVWriter):
 
 class CSVOutputFormat(KVWriter):
     def __init__(self, filename):
+        self.filename = filename
         self.file = open(filename, "w+t")
         self.keys = []
         self.sep = ","
@@ -153,6 +157,7 @@ class TensorBoardOutputFormat(KVWriter):
     """
 
     def __init__(self, dir):
+        self.filename = dir
         os.makedirs(dir, exist_ok=True)
         self.dir = dir
         self.step = 1
@@ -369,6 +374,7 @@ class Logger(object):
         for fmt in self.output_formats:
             if isinstance(fmt, KVWriter):
                 fmt.writekvs(d)
+        wandb.log(out)
         self.name2val.clear()
         self.name2cnt.clear()
         return out
@@ -465,6 +471,8 @@ def configure(dir=None, format_strs=None, comm=None, log_suffix=""):
             format_strs = os.getenv("OPENAI_LOG_FORMAT_MPI", "log").split(",")
     format_strs = filter(None, format_strs)
     output_formats = [make_output_format(f, dir, log_suffix) for f in format_strs]
+
+    [wandb.save(str(output_format.filename)) for output_format in output_formats]
 
     Logger.CURRENT = Logger(dir=dir, output_formats=output_formats, comm=comm)
     if output_formats:

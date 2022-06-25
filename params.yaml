@@ -1,36 +1,47 @@
-data_dir: "./data/raw/oct_test"
-schedule_sampler: uniform
-lr: 0.0001
-weight_decay: 0
-lr_anneal_steps: 0
-batch_size: 4
-microbatch: -1
-ema_rate: '0.9999'
-log_interval: 10
-save_interval: 100
-resume_checkpoint: ''
-use_fp16: false
-fp16_scale_growth: 0.001
-max_train_steps: 40000
-image_size: 128
-num_channels: 128
-num_res_blocks: 3
-num_heads: 4
-num_heads_upsample: -1
-num_head_channels: -1
-attention_resolutions: '16,8'
-channel_mult: ''
-dropout: 0
-class_cond: false
-use_checkpoint: false
-use_scale_shift_norm: true
-resblock_updown: false
-use_new_attention_order: false
-learn_sigma: false
-diffusion_steps: 100
-noise_schedule: linear
-timestep_respacing: ''
-use_kl: false
-predict_xstart: false
-rescale_timesteps: false
-rescale_learned_sigmas: false
+train:
+  output_dir: "./model"
+  data_dir: "./data/raw/oct_test"
+  schedule_sampler: uniform
+  lr: 0.0001
+  weight_decay: 0
+  lr_anneal_steps: 0
+  batch_size: 4
+  microbatch: -1
+  ema_rate: '0.9999'
+  log_interval: 10
+  save_interval: 100
+  output_interval: 1000
+  resume_checkpoint: ''
+  fp16_scale_growth: 0.001
+  max_train_steps: 40000
+sample:
+  clip_denoised: True
+  num_samples: 10
+  batch_size: 16
+  use_ddim: False
+  model_path: ""
+model:
+  image_size: 128
+  num_channels: 128
+  num_res_blocks: 2
+  num_heads: 4
+  num_heads_upsample: -1
+  num_head_channels: -1
+  attention_resolutions: "16,8"
+  channel_mult: ""
+  dropout: 0.0
+  class_cond: False
+  use_checkpoint: False
+  use_scale_shift_norm: True
+  resblock_updown: False
+  use_fp16: False
+  use_new_attention_order: False
+diffusion:
+  learn_sigma: False
+  diffusion_steps: 100
+  noise_schedule: "linear"
+  timestep_respacing: ""
+  use_kl: False
+  predict_xstart: False
+  rescale_timesteps: False
+  rescale_learned_sigmas: False
