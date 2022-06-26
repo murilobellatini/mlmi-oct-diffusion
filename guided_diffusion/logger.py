@@ -221,16 +221,14 @@ def logkv(key, val, step=None):
     Call this once for each diagnostic quantity, each iteration
     If called many times, last value will be used.
     """
-    wandb.log({key: val}, step=step)
-    get_current().logkv(key, val)
+    get_current().logkv(key, val, step)
 
 
 def logkv_mean(key, val, step=None):
     """
     The same as logkv(), but if called many times, values averaged.
     """
-    wandb.log({key: val}, step=step)
-    get_current().logkv_mean(key, val)
+    get_current().logkv_mean(key, val, step)
 
 
 def logkvs(d):
@@ -342,23 +340,30 @@ class Logger(object):
     # So that you can still log to the terminal without setting up any output files
     CURRENT = None  # Current logger being used by the free functions above
 
-    def __init__(self, dir, output_formats, comm=None):
+    def __init__(self, dir, output_formats, comm=None, web_logger=False):
         self.name2val = defaultdict(float)  # values this iteration
         self.name2cnt = defaultdict(int)
         self.level = INFO
         self.dir = dir
         self.output_formats = output_formats
         self.comm = comm
+        self.web_logger = web_logger
 
     # Logging API, forwarded
     # ----------------------------------------
-    def logkv(self, key, val):
+    def logkv(self, key, val, step):
         self.name2val[key] = val
+        
+        if self.web_logger:
+            wandb.log({key: val}, step=step)
 
     def logkv_mean(self, key, val):
         oldval, cnt = self.name2val[key], self.name2cnt[key]
         self.name2val[key] = oldval * cnt / (cnt + 1) + val / (cnt + 1)
         self.name2cnt[key] = cnt + 1
+        
+        if self.web_logger:
+            wandb.log({key: val}, step=step)
 
     def dumpkvs(self):
         if self.comm is None:
@@ -448,7 +453,7 @@ def mpi_weighted_mean(comm, local_name2valcount):
         return {}
 
 
-def configure(dir=None, format_strs=None, comm=None, log_suffix=""):
+def configure(dir=None, format_strs=None, comm=None, log_suffix="", web_logger=False):
     """
     If comm is provided, average all numerical stats across that comm
     """
@@ -477,7 +482,7 @@ def configure(dir=None, format_strs=None, comm=None, log_suffix=""):
 
     [wandb.save(str(output_format.filename)) for output_format in output_formats]
 
-    Logger.CURRENT = Logger(dir=dir, output_formats=output_formats, comm=comm)
+    Logger.CURRENT = Logger(dir=dir, output_formats=output_formats, comm=comm, web_logger=web_logger)
     if output_formats:
         log("Logging to %s" % dir)
 

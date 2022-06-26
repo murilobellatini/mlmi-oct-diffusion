@@ -37,7 +37,7 @@ def main(params_file):
     wandb.config = params
 
     dist_util.setup_dist()
-    logger.configure(dir=params_file["train"].get("output_dir", None))
+    logger.configure(dir=params_file["train"].get("output_dir", None), web_logger=True)
 
     logger.log("creating model and diffusion...")
     logger.log(f"loaded arguments are: {json.dumps(params, indent=4)}")
