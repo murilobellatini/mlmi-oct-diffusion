@@ -80,6 +80,7 @@ class TrainLoop:
         self.sync_cuda = th.cuda.is_available()
 
         self.last_model = None
+        self.evaluator = None
 
         logger.log("Is CUDA available:", self.sync_cuda)
 
@@ -193,12 +194,12 @@ class TrainLoop:
                 if self.output_interval is not None and self.step % self.output_interval == 0 and sampler_fn is not None and sample_params is not None and self.last_model is not None:
                     sample_params["model_path"] = self.last_model
                     images, _ = sampler_fn(sample_params)
+                    wandb.log({f"examples_{i}": wandb.Image(image) for i, image in enumerate(images)}, step=self.step + self.resume_step)
+                    wandb.log({"examples": [wandb.Image(image) for i, image in enumerate(images)]}, step=self.step + self.resume_step)
                     pred_loc = save_images(images, _, False)
-                    for i, image in enumerate(images):
-                        wandb.log({f"examples_{i}": wandb.Image(image)}, step=self.step + self.resume_step)
                     if self.ref_batch_loc is not None:
                         print("train_util", self.ref_batch_loc, pred_loc)
-                        compare_sample_images(self.ref_batch_loc, pred_loc)
+                        self.evaluator = compare_sample_images(self.ref_batch_loc, pred_loc, self.evaluator)
                 self.step += 1
                 pbar.update(1)
                 if self.step >= self.max_train_steps:

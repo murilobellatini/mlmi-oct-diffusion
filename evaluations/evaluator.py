@@ -28,22 +28,24 @@ FID_SPATIAL_NAME = "mixed_6/conv:0"
 # @click.command()
 # @click.option("--ref_batch")
 # @click.option("--sample_batch")
-def compare_sample_images(ref_batch, sample_batch):
+def compare_sample_images(ref_batch, sample_batch, evaluator=None):
     assert ref_batch is not None, "ref_batch should be provided"
     assert sample_batch is not None, "sample_batch should be provided"
 
     print("evaluator", ref_batch, sample_batch)
 
-    config = tf.ConfigProto(
-        allow_soft_placement=True  # allows DecodeJpeg to run on CPU in Inception graph
-    )
-    config.gpu_options.allow_growth = True
-    evaluator = Evaluator(tf.Session(config=config))
+    if evaluator is None:
+        config = tf.ConfigProto(
+            allow_soft_placement=True  # allows DecodeJpeg to run on CPU in Inception graph
+        )
+        config.gpu_options.allow_growth = True
+        
+        evaluator = Evaluator(tf.Session(config=config))
 
-    print("warming up TensorFlow...")
-    # This will cause TF to print a bunch of verbose stuff now rather
-    # than after the next print(), to help prevent confusion.
-    evaluator.warmup()
+        print("warming up TensorFlow...")
+        # This will cause TF to print a bunch of verbose stuff now rather
+        # than after the next print(), to help prevent confusion.
+        evaluator.warmup()
 
     print("computing reference batch activations...")
     ref_acts = evaluator.read_activations(ref_batch)
@@ -69,6 +71,8 @@ def compare_sample_images(ref_batch, sample_batch):
     print("Recall:", recall)
     
     wandb.log({"InceptionScore": incept_score, "FID": fid, "sFID": sfid, "precision": prec, "recall": recall})
+
+    return evaluator
 
 
 class InvalidFIDException(Exception):
