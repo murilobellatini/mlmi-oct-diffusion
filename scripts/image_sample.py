@@ -79,7 +79,16 @@ def sample_images(params):
     else:
         return arr, None
 
-
+def save_images(arr, label_arr, class_cond):
+    if dist.get_rank() == 0:
+        shape_str = "x".join([str(x) for x in arr.shape])
+        out_path = os.path.join(logger.get_dir(), f"samples_{shape_str}.npz")
+        logger.log(f"saving to {out_path}")
+        if class_cond:
+            np.savez(out_path, arr, label_arr)
+        else:
+            np.savez(out_path, arr)
+        return out_path
 
 @click.command()
 @click.argument("params_file", type=click.File("r"))
@@ -93,7 +102,7 @@ def main(params_file):
     params.update(params["diffusion"])
 
     wandb.login(key="f39476c0f8e0beb983d944d595be8f921ec05bfe")
-    wandb.init(project="OCT DM", entity="mlmioct22")
+    wandb.init(project="OCT_DM_SAMPLE", entity="mlmioct22")
     wandb.config = params
 
     dist_util.setup_dist()
@@ -103,14 +112,7 @@ def main(params_file):
 
     arr, label_arr = sample_images()
     
-    if dist.get_rank() == 0:
-        shape_str = "x".join([str(x) for x in arr.shape])
-        out_path = os.path.join(logger.get_dir(), f"samples_{shape_str}.npz")
-        logger.log(f"saving to {out_path}")
-        if params["class_cond"]:
-            np.savez(out_path, arr, label_arr)
-        else:
-            np.savez(out_path, arr)
+    save_images(arr, label_arr, params["class_cond"])
 
     dist.barrier()
     logger.log("sampling complete")

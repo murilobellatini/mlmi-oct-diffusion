@@ -10,9 +10,11 @@ from functools import partial
 from multiprocessing import cpu_count
 from multiprocessing.pool import ThreadPool
 from typing import Iterable, Optional, Tuple
+import click
 
 import numpy as np
 import requests
+import wandb
 import tensorflow.compat.v1 as tf
 from scipy import linalg
 from tqdm.auto import tqdm
@@ -23,12 +25,14 @@ INCEPTION_V3_PATH = "classify_image_graph_def.pb"
 FID_POOL_NAME = "pool_3:0"
 FID_SPATIAL_NAME = "mixed_6/conv:0"
 
+# @click.command()
+# @click.option("--ref_batch")
+# @click.option("--sample_batch")
+def compare_sample_images(ref_batch, sample_batch):
+    assert ref_batch is not None, "ref_batch should be provided"
+    assert sample_batch is not None, "sample_batch should be provided"
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("ref_batch", help="path to reference batch npz file")
-    parser.add_argument("sample_batch", help="path to sample batch npz file")
-    args = parser.parse_args()
+    print("evaluator", ref_batch, sample_batch)
 
     config = tf.ConfigProto(
         allow_soft_placement=True  # allows DecodeJpeg to run on CPU in Inception graph
@@ -42,22 +46,29 @@ def main():
     evaluator.warmup()
 
     print("computing reference batch activations...")
-    ref_acts = evaluator.read_activations(args.ref_batch)
+    ref_acts = evaluator.read_activations(ref_batch)
     print("computing/reading reference batch statistics...")
-    ref_stats, ref_stats_spatial = evaluator.read_statistics(args.ref_batch, ref_acts)
+    
+    ref_stats, ref_stats_spatial = evaluator.read_statistics_from_file(ref_batch, ref_acts)
 
     print("computing sample batch activations...")
-    sample_acts = evaluator.read_activations(args.sample_batch)
+    sample_acts = evaluator.read_activations(sample_batch)
     print("computing/reading sample batch statistics...")
-    sample_stats, sample_stats_spatial = evaluator.read_statistics(args.sample_batch, sample_acts)
+    sample_stats, sample_stats_spatial = evaluator.read_statistics_from_file(sample_batch, sample_acts)
+
+    incept_score = evaluator.compute_inception_score(sample_acts[0])
+    fid = sample_stats.frechet_distance(ref_stats)
+    sfid = sample_stats_spatial.frechet_distance(ref_stats_spatial)
+    prec, recall = evaluator.compute_prec_recall(ref_acts[0], sample_acts[0])
 
     print("Computing evaluations...")
-    print("Inception Score:", evaluator.compute_inception_score(sample_acts[0]))
-    print("FID:", sample_stats.frechet_distance(ref_stats))
-    print("sFID:", sample_stats_spatial.frechet_distance(ref_stats_spatial))
-    prec, recall = evaluator.compute_prec_recall(ref_acts[0], sample_acts[0])
+    print("Inception Score:", incept_score)
+    print("FID:", fid)
+    print("sFID:", sfid)
     print("Precision:", prec)
     print("Recall:", recall)
+    
+    wandb.log({"InceptionScore": incept_score, "FID": fid, "sFID": sfid, "precision": prec, "recall": recall})
 
 
 class InvalidFIDException(Exception):
@@ -161,7 +172,7 @@ class Evaluator:
             np.concatenate(spatial_preds, axis=0),
         )
 
-    def read_statistics(
+    def read_statistics_from_file(
         self, npz_path: str, activations: Tuple[np.ndarray, np.ndarray]
     ) -> Tuple[FIDStatistics, FIDStatistics]:
         obj = np.load(npz_path)
@@ -650,4 +661,4 @@ def _numpy_partition(arr, kth, **kwargs):
 
 
 if __name__ == "__main__":
-    main()
+    compare_sample_images()

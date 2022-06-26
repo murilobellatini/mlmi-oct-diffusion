@@ -14,6 +14,7 @@ train:
   resume_checkpoint: ''
   fp16_scale_growth: 0.001
   max_train_steps: 40000
+  reference_samples_path: "./KAGGLE_OCT_TEST_GT.npz"
 sample:
   clip_denoised: True
   num_samples: 10

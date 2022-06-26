@@ -12,6 +12,9 @@ from torch.nn.parallel.distributed import DistributedDataParallel as DDP
 from torch.optim import AdamW
 import wandb
 
+from scripts.image_sample import save_images
+from evaluations.evaluator import compare_sample_images
+
 from . import dist_util, logger
 from .fp16_util import MixedPrecisionTrainer
 from .nn import update_ema
@@ -38,6 +41,7 @@ class TrainLoop:
         save_interval,
         resume_checkpoint,
         output_interval=None,
+        ref_batch_loc=None,
         use_fp16=False,
         fp16_scale_growth=1e-3,
         schedule_sampler=None,
@@ -67,6 +71,8 @@ class TrainLoop:
         self.lr_anneal_steps = lr_anneal_steps
         self.max_train_steps = max_train_steps
 
+        self.ref_batch_loc = ref_batch_loc
+
         self.step = 0
         self.resume_step = 0
         self.global_batch = self.batch_size * dist.get_world_size()
@@ -76,7 +82,6 @@ class TrainLoop:
         self.last_model = None
 
         logger.log("Is CUDA available:", self.sync_cuda)
-        wandb.log({"cuda": self.sync_cuda})
 
         self._load_and_sync_parameters()
         self.mp_trainer = MixedPrecisionTrainer(
@@ -188,9 +193,12 @@ class TrainLoop:
                 if self.output_interval is not None and self.step % self.output_interval == 0 and sampler_fn is not None and sample_params is not None and self.last_model is not None:
                     sample_params["model_path"] = self.last_model
                     images, _ = sampler_fn(sample_params)
+                    pred_loc = save_images(images, _, False)
                     for i, image in enumerate(images):
-                        wandb.log({f"examples_{i}": wandb.Image(image)}, commit=False)
-                    wandb.log({}, commit=True)
+                        wandb.log({f"examples_{i}": wandb.Image(image)}, step=self.step + self.resume_step)
+                    if self.ref_batch_loc is not None:
+                        print("train_util", self.ref_batch_loc, pred_loc)
+                        compare_sample_images(self.ref_batch_loc, pred_loc)
                 self.step += 1
                 pbar.update(1)
                 if self.step >= self.max_train_steps:
@@ -240,7 +248,7 @@ class TrainLoop:
 
             loss = (losses["loss"] * weights).mean()
             log_loss_dict(
-                self.diffusion, t, {k: v * weights for k, v in losses.items()}
+                self.diffusion, t, {k: v * weights for k, v in losses.items()}, self.step + self.resume_step
             )
             self.mp_trainer.backward(loss)
 
@@ -257,12 +265,9 @@ class TrainLoop:
             param_group["lr"] = lr
 
     def log_step(self):
-        logger.logkv("unix_time", time())
-        logger.logkv("datetime", datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
-        wandb.log({"step": self.step + self.resume_step, "samples": (self.step + self.resume_step + 1) * self.global_batch})
-        logger.logkv("step", self.step + self.resume_step)
+        logger.logkv("step", self.step + self.resume_step, self.step + self.resume_step)
         logger.logkv("samples", (self.step + self.resume_step + 1)
-                     * self.global_batch)
+                     * self.global_batch, self.step + self.resume_step)
 
     def save(self):
         def save_checkpoint(rate, params):
@@ -330,13 +335,10 @@ def find_ema_checkpoint(main_checkpoint, step, rate):
     return None
 
 
-def log_loss_dict(diffusion, ts, losses):
+def log_loss_dict(diffusion, ts, losses, step=None):
     for key, values in losses.items():
-        logger.logkv_mean(key, values.mean().item())
-        wandb.log({key: values.mean().item()}, commit=False)
+        logger.logkv_mean(key, values.mean().item(), step)
         # Log the quantiles (four quartiles, in particular).
         for sub_t, sub_loss in zip(ts.cpu().numpy(), values.detach().cpu().numpy()):
             quartile = int(4 * sub_t / diffusion.num_timesteps)
-            logger.logkv_mean(f"{key}_q{quartile}", sub_loss)
-            wandb.log({f"{key}_q{quartile}": sub_loss}, commit=False)
-    wandb.log({}, commit=True)
+            logger.logkv_mean(f"{key}_q{quartile}", sub_loss, step)

@@ -33,7 +33,7 @@ def main(params_file):
     sample_params.update(params_file["diffusion"])
 
     wandb.login(key="f39476c0f8e0beb983d944d595be8f921ec05bfe")
-    wandb.init(project="OCT DM", entity="mlmioct22")
+    wandb.init(project="OCT_DM_TRAIN", entity="mlmioct22")
     wandb.config = params
 
     dist_util.setup_dist()
@@ -76,7 +76,8 @@ def main(params_file):
         schedule_sampler=schedule_sampler,
         weight_decay=params["weight_decay"],
         lr_anneal_steps=params["lr_anneal_steps"],
-        max_train_steps=params["max_train_steps"]
+        max_train_steps=params["max_train_steps"],
+        ref_batch_loc=params.get("reference_samples_path", None)
     ).run_loop(sample_images, sample_params)
 
 

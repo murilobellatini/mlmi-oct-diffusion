@@ -7,6 +7,7 @@ import os
 import sys
 import shutil
 import os.path as osp
+from matplotlib.pyplot import step
 import wandb
 import json
 import time
@@ -214,19 +215,21 @@ def make_output_format(format, ev_dir, log_suffix=""):
 # ================================================================
 
 
-def logkv(key, val):
+def logkv(key, val, step=None):
     """
     Log a value of some diagnostic
     Call this once for each diagnostic quantity, each iteration
     If called many times, last value will be used.
     """
+    wandb.log({key: val}, step=step)
     get_current().logkv(key, val)
 
 
-def logkv_mean(key, val):
+def logkv_mean(key, val, step=None):
     """
     The same as logkv(), but if called many times, values averaged.
     """
+    wandb.log({key: val}, step=step)
     get_current().logkv_mean(key, val)
 
 
