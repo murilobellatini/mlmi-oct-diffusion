@@ -357,7 +357,7 @@ class Logger(object):
         if self.web_logger:
             wandb.log({key: val}, step=step)
 
-    def logkv_mean(self, key, val):
+    def logkv_mean(self, key, val, step):
         oldval, cnt = self.name2val[key], self.name2cnt[key]
         self.name2val[key] = oldval * cnt / (cnt + 1) + val / (cnt + 1)
         self.name2cnt[key] = cnt + 1

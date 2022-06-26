@@ -181,14 +181,14 @@ class MixedPrecisionTrainer:
         else:
             loss.backward()
 
-    def optimize(self, opt: th.optim.Optimizer):
+    def optimize(self, opt: th.optim.Optimizer, step=None):
         if self.use_fp16:
-            return self._optimize_fp16(opt)
+            return self._optimize_fp16(opt, step)
         else:
-            return self._optimize_normal(opt)
+            return self._optimize_normal(opt, step)
 
-    def _optimize_fp16(self, opt: th.optim.Optimizer):
-        logger.logkv_mean("lg_loss_scale", self.lg_loss_scale, self.step + self.resume_step)
+    def _optimize_fp16(self, opt: th.optim.Optimizer, step=None):
+        logger.logkv_mean("lg_loss_scale", self.lg_loss_scale, step)
         model_grads_to_master_grads(self.param_groups_and_shapes, self.master_params)
         grad_norm, param_norm = self._compute_norms(grad_scale=2 ** self.lg_loss_scale)
         if check_overflow(grad_norm):
@@ -197,8 +197,8 @@ class MixedPrecisionTrainer:
             zero_master_grads(self.master_params)
             return False
 
-        logger.logkv_mean("grad_norm", grad_norm, self.step + self.resume_step)
-        logger.logkv_mean("param_norm", param_norm, self.step + self.resume_step)
+        logger.logkv_mean("grad_norm", grad_norm, step)
+        logger.logkv_mean("param_norm", param_norm, step)
 
         self.master_params[0].grad.mul_(1.0 / (2 ** self.lg_loss_scale))
         opt.step()
@@ -207,10 +207,10 @@ class MixedPrecisionTrainer:
         self.lg_loss_scale += self.fp16_scale_growth
         return True
 
-    def _optimize_normal(self, opt: th.optim.Optimizer):
+    def _optimize_normal(self, opt: th.optim.Optimizer, step = None):
         grad_norm, param_norm = self._compute_norms()
-        logger.logkv_mean("grad_norm", grad_norm, self.step + self.resume_step)
-        logger.logkv_mean("param_norm", param_norm, self.step + self.resume_step)
+        logger.logkv_mean("grad_norm", grad_norm, step)
+        logger.logkv_mean("param_norm", param_norm, step)
         opt.step()
         return True
 

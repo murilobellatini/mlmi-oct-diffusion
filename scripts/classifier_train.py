@@ -150,7 +150,7 @@ def main():
         if args.anneal_lr:
             set_annealed_lr(opt, args.lr, (step + resume_step) / args.iterations)
         forward_backward_log(data)
-        mp_trainer.optimize(opt)
+        mp_trainer.optimize(opt, step)
         if val_data is not None and not step % args.eval_interval:
             with th.no_grad():
                 with model.no_sync():

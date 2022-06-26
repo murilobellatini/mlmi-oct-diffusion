@@ -209,7 +209,7 @@ class TrainLoop:
 
     def run_step(self, batch, cond):
         self.forward_backward(batch, cond)
-        took_step = self.mp_trainer.optimize(self.opt)
+        took_step = self.mp_trainer.optimize(self.opt, self.step + self.resume_step)
         if took_step:
             self._update_ema()
         self._anneal_lr()
