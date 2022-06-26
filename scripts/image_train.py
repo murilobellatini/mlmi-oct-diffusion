@@ -56,12 +56,22 @@ def main(params_file):
         image_size=params["image_size"],
         class_cond=params["class_cond"],
     )
+    if params.get("valid_data_dir", None) is not None and params["valid_data_dir"] != "":
+        data_valid = load_data(
+            data_dir=params["valid_data_dir"],
+            batch_size=params["batch_size"],
+            image_size=params["image_size"],
+            class_cond=params["class_cond"],
+        )
+    else:
+        data_valid = None
 
     logger.log("training...")
     TrainLoop(
         model=model,
         diffusion=diffusion,
         data=data,
+        data_valid=data_valid,
         batch_size=params["batch_size"],
         microbatch=params["microbatch"],
         lr=params["lr"],

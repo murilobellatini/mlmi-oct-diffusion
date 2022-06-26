@@ -40,6 +40,7 @@ class TrainLoop:
         log_interval,
         save_interval,
         resume_checkpoint,
+        data_valid=None,
         output_interval=None,
         ref_batch_loc=None,
         use_fp16=False,
@@ -52,6 +53,7 @@ class TrainLoop:
         self.model = model
         self.diffusion = diffusion
         self.data = data
+        self.data_valid = data_valid
         self.batch_size = batch_size
         self.microbatch = microbatch if microbatch > 0 else batch_size
         self.lr = lr
@@ -184,6 +186,10 @@ class TrainLoop:
                 batch, cond = next(self.data)
                 self.run_step(batch, cond)
 
+                if self.data_valid is not None:
+                    valid_batch, valid_cond = next(self.data_valid)
+                    self.forward_backward(valid_batch, valid_cond, True)
+
                 if self.step % self.log_interval == 0:
                     logger.dumpkvs()
                 if self.step % self.save_interval == 0:
@@ -208,15 +214,15 @@ class TrainLoop:
         if (self.step - 1) % self.save_interval != 0:
             self.save()
 
-    def run_step(self, batch, cond):
-        self.forward_backward(batch, cond)
+    def run_step(self, batch, cond, is_valid=False):
+        self.forward_backward(batch, cond, is_valid)
         took_step = self.mp_trainer.optimize(self.opt, self.step + self.resume_step)
         if took_step:
             self._update_ema()
         self._anneal_lr()
         self.log_step()
 
-    def forward_backward(self, batch, cond):
+    def forward_backward(self, batch, cond, is_valid=False):
         self.mp_trainer.zero_grad()
         for i in range(0, batch.shape[0], self.microbatch):
             micro = batch[i: i + self.microbatch].to(dist_util.dev())
@@ -242,16 +248,17 @@ class TrainLoop:
                 with self.ddp_model.no_sync():
                     losses = compute_losses()
 
-            if isinstance(self.schedule_sampler, LossAwareSampler):
+            if isinstance(self.schedule_sampler, LossAwareSampler) and not is_valid:
                 self.schedule_sampler.update_with_local_losses(
                     t, losses["loss"].detach()
                 )
 
             loss = (losses["loss"] * weights).mean()
             log_loss_dict(
-                self.diffusion, t, {k: v * weights for k, v in losses.items()}, self.step + self.resume_step
+                self.diffusion, t, {k: v * weights for k, v in losses.items()}, self.step + self.resume_step, is_valid
             )
-            self.mp_trainer.backward(loss)
+            if not is_valid:
+                self.mp_trainer.backward(loss)
 
     def _update_ema(self):
         for rate, params in zip(self.ema_rate, self.ema_params):
@@ -336,10 +343,10 @@ def find_ema_checkpoint(main_checkpoint, step, rate):
     return None
 
 
-def log_loss_dict(diffusion, ts, losses, step=None):
+def log_loss_dict(diffusion, ts, losses, step=None, is_valid=False):
     for key, values in losses.items():
-        logger.logkv_mean(key, values.mean().item(), step)
+        logger.logkv_mean("valid_" * is_valid + key, values.mean().item(), step)
         # Log the quantiles (four quartiles, in particular).
         for sub_t, sub_loss in zip(ts.cpu().numpy(), values.detach().cpu().numpy()):
             quartile = int(4 * sub_t / diffusion.num_timesteps)
-            logger.logkv_mean(f"{key}_q{quartile}", sub_loss, step)
+            logger.logkv_mean("valid_" * is_valid + f"{key}_q{quartile}", sub_loss, step)
