@@ -10,6 +10,10 @@ import torch as th
 import torch.distributed as dist
 from torch.nn.parallel.distributed import DistributedDataParallel as DDP
 from torch.optim import AdamW
+import wandb
+
+from scripts.image_sample import save_images
+from evaluations.evaluator import compare_sample_images
 
 from . import dist_util, logger
 from .fp16_util import MixedPrecisionTrainer
@@ -36,6 +40,9 @@ class TrainLoop:
         log_interval,
         save_interval,
         resume_checkpoint,
+        data_valid=None,
+        output_interval=None,
+        ref_batch_loc=None,
         use_fp16=False,
         fp16_scale_growth=1e-3,
         schedule_sampler=None,
@@ -46,6 +53,7 @@ class TrainLoop:
         self.model = model
         self.diffusion = diffusion
         self.data = data
+        self.data_valid = data_valid
         self.batch_size = batch_size
         self.microbatch = microbatch if microbatch > 0 else batch_size
         self.lr = lr
@@ -57,6 +65,7 @@ class TrainLoop:
         self.log_interval = log_interval
         self.save_interval = save_interval
         self.resume_checkpoint = resume_checkpoint
+        self.output_interval = output_interval
         self.use_fp16 = use_fp16
         self.fp16_scale_growth = fp16_scale_growth
         self.schedule_sampler = schedule_sampler or UniformSampler(diffusion)
@@ -64,11 +73,16 @@ class TrainLoop:
         self.lr_anneal_steps = lr_anneal_steps
         self.max_train_steps = max_train_steps
 
+        self.ref_batch_loc = ref_batch_loc
+
         self.step = 0
         self.resume_step = 0
         self.global_batch = self.batch_size * dist.get_world_size()
 
         self.sync_cuda = th.cuda.is_available()
+
+        self.last_model = None
+        self.evaluator = None
 
         logger.log("Is CUDA available:", self.sync_cuda)
 
@@ -111,6 +125,7 @@ class TrainLoop:
                     "Distributed training requires CUDA. "
                     "Gradients will not be synchronized properly!"
                 )
+                wandb.log(title="No CUDA Found", text= "Distributed training requires CUDA. Gradients will not be synchronized properly!", level=wandb.AlertLevel.WARN)
             self.use_ddp = False
             self.ddp_model = self.model
 
@@ -162,7 +177,7 @@ class TrainLoop:
             )
             self.opt.load_state_dict(state_dict)
 
-    def run_loop(self):
+    def run_loop(self, sampler_fn = None, sample_params = None):
         with tqdm(total=self.max_train_steps) as pbar:
             while (
                 not self.lr_anneal_steps
@@ -171,6 +186,10 @@ class TrainLoop:
                 batch, cond = next(self.data)
                 self.run_step(batch, cond)
 
+                if self.data_valid is not None:
+                    valid_batch, valid_cond = next(self.data_valid)
+                    self.forward_backward(valid_batch, valid_cond, True)
+
                 if self.step % self.log_interval == 0:
                     logger.dumpkvs()
                 if self.step % self.save_interval == 0:
@@ -178,6 +197,15 @@ class TrainLoop:
                     # Run for a finite amount of time in integration tests.
                     if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0:
                         return
+                if self.output_interval is not None and self.step % self.output_interval == 0 and sampler_fn is not None and sample_params is not None and self.last_model is not None:
+                    sample_params["model_path"] = self.last_model
+                    images, _ = sampler_fn(sample_params)
+                    wandb.log({f"examples_{i}": wandb.Image(image) for i, image in enumerate(images)}, step=self.step + self.resume_step)
+                    wandb.log({"examples": [wandb.Image(image) for i, image in enumerate(images)]}, step=self.step + self.resume_step)
+                    pred_loc = save_images(images, _, False)
+                    if self.ref_batch_loc is not None:
+                        print("train_util", self.ref_batch_loc, pred_loc)
+                        self.evaluator = compare_sample_images(self.ref_batch_loc, pred_loc, self.evaluator)
                 self.step += 1
                 pbar.update(1)
                 if self.step >= self.max_train_steps:
@@ -186,15 +214,15 @@ class TrainLoop:
         if (self.step - 1) % self.save_interval != 0:
             self.save()
 
-    def run_step(self, batch, cond):
-        self.forward_backward(batch, cond)
-        took_step = self.mp_trainer.optimize(self.opt)
+    def run_step(self, batch, cond, is_valid=False):
+        self.forward_backward(batch, cond, is_valid)
+        took_step = self.mp_trainer.optimize(self.opt, self.step + self.resume_step)
         if took_step:
             self._update_ema()
         self._anneal_lr()
         self.log_step()
 
-    def forward_backward(self, batch, cond):
+    def forward_backward(self, batch, cond, is_valid=False):
         self.mp_trainer.zero_grad()
         for i in range(0, batch.shape[0], self.microbatch):
             micro = batch[i: i + self.microbatch].to(dist_util.dev())
@@ -220,16 +248,17 @@ class TrainLoop:
                 with self.ddp_model.no_sync():
                     losses = compute_losses()
 
-            if isinstance(self.schedule_sampler, LossAwareSampler):
+            if isinstance(self.schedule_sampler, LossAwareSampler) and not is_valid:
                 self.schedule_sampler.update_with_local_losses(
                     t, losses["loss"].detach()
                 )
 
             loss = (losses["loss"] * weights).mean()
             log_loss_dict(
-                self.diffusion, t, {k: v * weights for k, v in losses.items()}
+                self.diffusion, t, {k: v * weights for k, v in losses.items()}, self.step + self.resume_step, is_valid
             )
-            self.mp_trainer.backward(loss)
+            if not is_valid:
+                self.mp_trainer.backward(loss)
 
     def _update_ema(self):
         for rate, params in zip(self.ema_rate, self.ema_params):
@@ -244,11 +273,9 @@ class TrainLoop:
             param_group["lr"] = lr
 
     def log_step(self):
-        logger.logkv("unix_time", time())
-        logger.logkv("datetime", datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
-        logger.logkv("step", self.step + self.resume_step)
+        logger.logkv("step", self.step + self.resume_step, self.step + self.resume_step)
         logger.logkv("samples", (self.step + self.resume_step + 1)
-                     * self.global_batch)
+                     * self.global_batch, self.step + self.resume_step)
 
     def save(self):
         def save_checkpoint(rate, params):
@@ -261,6 +288,8 @@ class TrainLoop:
                     filename = f"ema_{rate}_{(self.step+self.resume_step):06d}.pt"
                 with bf.BlobFile(bf.join(get_blob_logdir(), filename), "wb") as f:
                     th.save(state_dict, f)
+                    if "model" in filename:
+                        self.last_model = bf.join(get_blob_logdir(), filename)
 
         save_checkpoint(0, self.mp_trainer.master_params)
         for rate, params in zip(self.ema_rate, self.ema_params):
@@ -314,10 +343,10 @@ def find_ema_checkpoint(main_checkpoint, step, rate):
     return None
 
 
-def log_loss_dict(diffusion, ts, losses):
+def log_loss_dict(diffusion, ts, losses, step=None, is_valid=False):
     for key, values in losses.items():
-        logger.logkv_mean(key, values.mean().item())
+        logger.logkv_mean("valid_" * is_valid + key, values.mean().item(), step)
         # Log the quantiles (four quartiles, in particular).
         for sub_t, sub_loss in zip(ts.cpu().numpy(), values.detach().cpu().numpy()):
             quartile = int(4 * sub_t / diffusion.num_timesteps)
-            logger.logkv_mean(f"{key}_q{quartile}", sub_loss)
+            logger.logkv_mean("valid_" * is_valid + f"{key}_q{quartile}", sub_loss, step)

@@ -5,11 +5,13 @@ process towards more realistic images.
 
 import argparse
 import os
+from matplotlib.pyplot import text
 
 import numpy as np
 import torch as th
 import torch.distributed as dist
 import torch.nn.functional as F
+import wandb
 
 from guided_diffusion import dist_util, logger
 from guided_diffusion.script_util import (
@@ -95,6 +97,7 @@ def main():
         dist.all_gather(gathered_labels, classes)
         all_labels.extend([labels.cpu().numpy() for labels in gathered_labels])
         logger.log(f"created {len(all_images) * args.batch_size} samples")
+        wandb.alert(title="Sampled Data", text=f"created {len(all_images) * args.batch_size} samples", level=wandb.AlertLevel.INFO)
 
     arr = np.concatenate(all_images, axis=0)
     arr = arr[: args.num_samples]

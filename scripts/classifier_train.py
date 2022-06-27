@@ -6,11 +6,13 @@ import argparse
 import os
 
 import blobfile as bf
+from matplotlib.pyplot import title
 import torch as th
 import torch.distributed as dist
 import torch.nn.functional as F
 from torch.nn.parallel.distributed import DistributedDataParallel as DDP
 from torch.optim import AdamW
+import wandb
 
 from guided_diffusion import dist_util, logger
 from guided_diffusion.fp16_util import MixedPrecisionTrainer
@@ -88,6 +90,8 @@ def main():
     else:
         val_data = None
 
+    wandb.alert(title="Data Loaded", text="Data loaded and loader is created", level=wandb.AlertLevel.INFO)
+
     logger.log(f"creating optimizer...")
     opt = AdamW(mp_trainer.master_params, lr=args.lr, weight_decay=args.weight_decay)
     if args.resume_checkpoint:
@@ -98,6 +102,8 @@ def main():
         opt.load_state_dict(
             dist_util.load_state_dict(opt_checkpoint, map_location=dist_util.dev())
         )
+
+    wandb.alert(title="Optimizer Created", text="Optimizer created", level=wandb.AlertLevel.INFO)
 
     logger.log("training classifier model...")
 
@@ -144,7 +150,7 @@ def main():
         if args.anneal_lr:
             set_annealed_lr(opt, args.lr, (step + resume_step) / args.iterations)
         forward_backward_log(data)
-        mp_trainer.optimize(opt)
+        mp_trainer.optimize(opt, step)
         if val_data is not None and not step % args.eval_interval:
             with th.no_grad():
                 with model.no_sync():
