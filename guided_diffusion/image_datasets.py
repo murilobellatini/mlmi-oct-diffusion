@@ -19,7 +19,7 @@ def load_data(
     class_cond=False,
     deterministic=False,
     random_crop=True,
-    random_flip=True,
+    random_flip=False,
 ):
     """
     For a dataset, create a generator over (images, kwargs) pairs.
