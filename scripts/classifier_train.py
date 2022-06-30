@@ -90,7 +90,11 @@ def main():
     else:
         val_data = None
 
-    wandb.alert(title="Data Loaded", text="Data loaded and loader is created", level=wandb.AlertLevel.INFO)
+    wandb.alert(
+        title="Data Loaded",
+        text="Data loaded and loader is created",
+        level=wandb.AlertLevel.INFO,
+    )
 
     logger.log(f"creating optimizer...")
     opt = AdamW(mp_trainer.master_params, lr=args.lr, weight_decay=args.weight_decay)
@@ -103,7 +107,9 @@ def main():
             dist_util.load_state_dict(opt_checkpoint, map_location=dist_util.dev())
         )
 
-    wandb.alert(title="Optimizer Created", text="Optimizer created", level=wandb.AlertLevel.INFO)
+    wandb.alert(
+        title="Optimizer Created", text="Optimizer created", level=wandb.AlertLevel.INFO
+    )
 
     logger.log("training classifier model...")
 

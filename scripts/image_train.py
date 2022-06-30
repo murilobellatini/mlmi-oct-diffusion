@@ -17,6 +17,7 @@ from guided_diffusion.script_util import (
 from guided_diffusion.train_util import TrainLoop
 from scripts.image_sample import get_default_params_sample, sample_images
 
+
 @click.command()
 @click.argument("params_file", type=click.File("r"))
 def main(params_file):
@@ -40,7 +41,7 @@ def main(params_file):
 
     logger.log("creating model and diffusion...")
     logger.log(f"loaded arguments are: {json.dumps(params, indent=4)}")
-    
+
     model, diffusion = create_model_and_diffusion(
         **{k: params[k] for k in model_and_diffusion_defaults().keys() if k in params}
     )
@@ -56,7 +57,10 @@ def main(params_file):
         image_size=params["image_size"],
         class_cond=params["class_cond"],
     )
-    if params.get("valid_data_dir", None) is not None and params["valid_data_dir"] != "":
+    if (
+        params.get("valid_data_dir", None) is not None
+        and params["valid_data_dir"] != ""
+    ):
         data_valid = load_data(
             data_dir=params["valid_data_dir"],
             batch_size=params["batch_size"],
@@ -86,7 +90,7 @@ def main(params_file):
         weight_decay=params["weight_decay"],
         lr_anneal_steps=params["lr_anneal_steps"],
         max_train_steps=params["max_train_steps"],
-        ref_batch_loc=params.get("reference_samples_path", None)
+        ref_batch_loc=params.get("reference_samples_path", None),
     ).run_loop(sample_images, sample_params)
 
 
@@ -106,7 +110,7 @@ def get_default_params():
         resume_checkpoint="",
         use_fp16=False,
         fp16_scale_growth=1e-3,
-        max_train_steps=100
+        max_train_steps=100,
     )
     defaults.update(model_and_diffusion_defaults())
     # parser = argparse.ArgumentParser()

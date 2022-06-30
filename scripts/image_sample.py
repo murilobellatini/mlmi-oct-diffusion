@@ -42,11 +42,16 @@ def sample_images(params):
         model_kwargs = {}
         if params["class_cond"]:
             classes = th.randint(
-                low=0, high=NUM_CLASSES, size=(params["batch_size"],), device=dist_util.dev()
+                low=0,
+                high=NUM_CLASSES,
+                size=(params["batch_size"],),
+                device=dist_util.dev(),
             )
             model_kwargs["y"] = classes
         sample_fn = (
-            diffusion.p_sample_loop if not params["use_ddim"] else diffusion.ddim_sample_loop
+            diffusion.p_sample_loop
+            if not params["use_ddim"]
+            else diffusion.ddim_sample_loop
         )
         sample = sample_fn(
             model,
@@ -79,6 +84,7 @@ def sample_images(params):
     else:
         return arr, None
 
+
 def save_images(arr, label_arr, class_cond):
     if dist.get_rank() == 0:
         shape_str = "x".join([str(x) for x in arr.shape])
@@ -90,13 +96,14 @@ def save_images(arr, label_arr, class_cond):
             np.savez(out_path, arr)
         return out_path
 
+
 @click.command()
 @click.argument("params_file", type=click.File("r"))
 def main(params_file):
     params = get_default_params_sample()
 
     params_file = yaml.safe_load(params_file)
-    
+
     params.update(params["sample"])
     params.update(params["model"])
     params.update(params["diffusion"])
@@ -111,11 +118,12 @@ def main(params_file):
     logger.log("creating model and diffusion...")
 
     arr, label_arr = sample_images()
-    
+
     save_images(arr, label_arr, params["class_cond"])
 
     dist.barrier()
     logger.log("sampling complete")
+
 
 def get_default_params_sample():
     defaults = dict(
