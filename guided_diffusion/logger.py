@@ -353,7 +353,7 @@ class Logger(object):
     # ----------------------------------------
     def logkv(self, key, val, step):
         self.name2val[key] = val
-        
+
         if self.web_logger:
             wandb.log({key: val}, step=step)
 
@@ -361,7 +361,7 @@ class Logger(object):
         oldval, cnt = self.name2val[key], self.name2cnt[key]
         self.name2val[key] = oldval * cnt / (cnt + 1) + val / (cnt + 1)
         self.name2cnt[key] = cnt + 1
-        
+
         if self.web_logger:
             wandb.log({key: val}, step=step)
 
@@ -482,7 +482,9 @@ def configure(dir=None, format_strs=None, comm=None, log_suffix="", web_logger=F
 
     [wandb.save(str(output_format.filename)) for output_format in output_formats]
 
-    Logger.CURRENT = Logger(dir=dir, output_formats=output_formats, comm=comm, web_logger=web_logger)
+    Logger.CURRENT = Logger(
+        dir=dir, output_formats=output_formats, comm=comm, web_logger=web_logger
+    )
     if output_formats:
         log("Logging to %s" % dir)
 
@@ -508,4 +510,3 @@ def scoped_configure(dir=None, format_strs=None, comm=None):
     finally:
         Logger.CURRENT.close()
         Logger.CURRENT = prevlogger
-
