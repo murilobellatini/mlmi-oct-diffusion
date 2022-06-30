@@ -11,7 +11,9 @@ import mimetypes
 mimetypes.init()
 
 
-def resize_images(input_dir: pl.Path, size: tuple, output_dir: pl.Path = None, new_suffix='.jpg') -> bool:
+def resize_images(
+    input_dir: pl.Path, size: tuple, output_dir: pl.Path = None, new_suffix=".jpg"
+) -> bool:
     """Resizes all images within folder.
 
     Args:
@@ -26,7 +28,7 @@ def resize_images(input_dir: pl.Path, size: tuple, output_dir: pl.Path = None, n
 
     """
     if not output_dir:
-        output_dir = input_dir / 'resized'
+        output_dir = input_dir / "resized"
 
     safe_makedirs(output_dir)
 
@@ -37,7 +39,7 @@ def resize_images(input_dir: pl.Path, size: tuple, output_dir: pl.Path = None, n
 
         ftype = mimetypes.guess_type(ipath)[0]
 
-        if not ftype or 'image' not in ftype:
+        if not ftype or "image" not in ftype:
             # skips non images files
             continue
 
@@ -46,8 +48,8 @@ def resize_images(input_dir: pl.Path, size: tuple, output_dir: pl.Path = None, n
 
         iimg = Image.open(ipath)
         oimg = iimg.resize(size)
-        if new_suffix == '.jpg':
-            oimg = oimg.convert('RGB')
+        if new_suffix == ".jpg":
+            oimg = oimg.convert("RGB")
         oimg.save(opath)
 
     return True
@@ -106,11 +108,13 @@ def get_figsize(subplots_size: tuple, scaling_factor: int = 2) -> tuple:
     Returns:
         tuple: Figsize dimension
     """
-    x, y = tuple(map(lambda x: scaling_factor*x, subplots_size))
+    x, y = tuple(map(lambda x: scaling_factor * x, subplots_size))
     return y, x
 
 
-def render_samples(spath: pl.Path, samples2render: int = 10, subplots_size=(5, 2), title=None) -> figure.Figure:
+def render_samples(
+    spath: pl.Path, samples2render: int = 10, subplots_size=(5, 2), title=None
+) -> figure.Figure:
     """
     Displays in IPython notebook the images produced by the model.
 
@@ -126,7 +130,8 @@ def render_samples(spath: pl.Path, samples2render: int = 10, subplots_size=(5, 2
         figure.Figure: Plot with rendered samples
     """
     assert samples2render <= np.prod(
-        subplots_size), f'`samples2render` ({samples2render}) does not fit `subplots_size` ({subplots_size}): {samples2render} > {np.prod(subplots_size)}'
+        subplots_size
+    ), f"`samples2render` ({samples2render}) does not fit `subplots_size` ({subplots_size}): {samples2render} > {np.prod(subplots_size)}"
 
     image_arrays = np.load(spath)["arr_0"]
     samples2render = min(image_arrays.shape[0], samples2render)
@@ -141,7 +146,7 @@ def render_samples(spath: pl.Path, samples2render: int = 10, subplots_size=(5, 2
         *subplots_size,
         figsize=get_figsize(subplots_size),
         squeeze=False,
-        constrained_layout=True
+        constrained_layout=True,
     )
 
     for ix, img in enumerate(images):
