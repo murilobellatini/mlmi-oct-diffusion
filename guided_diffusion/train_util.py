@@ -11,9 +11,9 @@ import torch.distributed as dist
 from torch.nn.parallel.distributed import DistributedDataParallel as DDP
 from torch.optim import AdamW
 import wandb
+from guided_diffusion.train_sample import sample_images, save_images
 
-from scripts.image_sample import save_images
-from evaluations.evaluator import compare_sample_images
+from guided_diffusion.evaluations.evaluator import compare_sample_images
 
 from . import dist_util, logger
 from .fp16_util import MixedPrecisionTrainer
@@ -40,6 +40,8 @@ class TrainLoop:
         log_interval,
         save_interval,
         resume_checkpoint,
+        save_only_best=False,
+        save_on=None,
         data_valid=None,
         output_interval=None,
         ref_batch_loc=None,
@@ -62,6 +64,7 @@ class TrainLoop:
             if isinstance(ema_rate, float)
             else [float(x) for x in ema_rate.split(",")]
         )
+
         self.log_interval = log_interval
         self.save_interval = save_interval
         self.resume_checkpoint = resume_checkpoint
@@ -72,6 +75,12 @@ class TrainLoop:
         self.weight_decay = weight_decay
         self.lr_anneal_steps = lr_anneal_steps
         self.max_train_steps = max_train_steps
+
+        self.save_only_best = save_only_best
+        self.save_on = save_on
+        self.best_metric = float("inf")
+
+        assert not save_only_best or save_on is not None, "Please give a save on metric for best only save"
 
         self.ref_batch_loc = ref_batch_loc
 
@@ -183,28 +192,37 @@ class TrainLoop:
                 or self.step + self.resume_step < self.lr_anneal_steps
             ):
                 batch, cond = next(self.data)
-                self.run_step(batch, cond)
+                losses = self.run_step(batch, cond)
 
                 if self.data_valid is not None:
                     valid_batch, valid_cond = next(self.data_valid)
-                    self.forward_backward(valid_batch, valid_cond, True)
+                    valid_losses = self.forward_backward(valid_batch, valid_cond, True)
+                    valid_losses = {f"valid_{k}": v for k, v in valid_losses.items()}
+                    losses.update(valid_losses)
 
                 if self.step % self.log_interval == 0:
                     logger.dumpkvs()
-                if self.step % self.save_interval == 0:
+                if (self.step % self.save_interval == 0) or (self.save_only_best and self.best_metric < losses[self.save_on]):
+                    if self.save_only_best:
+                        self.best_metric = losses[self.save_on]
                     self.save()
                     # Run for a finite amount of time in integration tests.
                     if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0:
                         return
                 if (
                     self.output_interval is not None
+                    and self.output_interval > 0
                     and self.step % self.output_interval == 0
                     and sampler_fn is not None
                     and sample_params is not None
                     and self.last_model is not None
                 ):
                     sample_params["model_path"] = self.last_model
-                    images, _ = sampler_fn(sample_params)
+                    
+                    images, _ = sample_images(sample_params, model=self.model, diffusion=self.diffusion, micro=micro, t=t)
+                    # images, _ = sample_images(sample_params)
+                    self.model.train()
+
                     wandb.log(
                         {
                             f"examples_{i}": wandb.Image(image)
@@ -212,6 +230,7 @@ class TrainLoop:
                         },
                         step=self.step + self.resume_step,
                     )
+                    
                     wandb.log(
                         {
                             "examples": [
@@ -222,7 +241,6 @@ class TrainLoop:
                     )
                     pred_loc = save_images(images, _, False)
                     if self.ref_batch_loc is not None:
-                        print("train_util", self.ref_batch_loc, pred_loc)
                         self.evaluator = compare_sample_images(
                             self.ref_batch_loc, pred_loc, self.evaluator
                         )
@@ -282,6 +300,7 @@ class TrainLoop:
             )
             if not is_valid:
                 self.mp_trainer.backward(loss)
+        return losses
 
     def _update_ema(self):
         for rate, params in zip(self.ema_rate, self.ema_params):
@@ -309,9 +328,15 @@ class TrainLoop:
             if dist.get_rank() == 0:
                 logger.log(f"saving model {rate}...")
                 if not rate:
-                    filename = f"model{(self.step+self.resume_step):06d}.pt"
+                    if self.save_only_best:
+                        filename = f"model.pt"
+                    else:
+                        filename = f"model{(self.step+self.resume_step):06d}.pt"
                 else:
-                    filename = f"ema_{rate}_{(self.step+self.resume_step):06d}.pt"
+                    if self.save_only_best:
+                        filename = f"ema.pt"
+                    else:
+                        filename = f"ema_{rate}_{(self.step+self.resume_step):06d}.pt"
                 with bf.BlobFile(bf.join(get_blob_logdir(), filename), "wb") as f:
                     th.save(state_dict, f)
                     if "model" in filename:
