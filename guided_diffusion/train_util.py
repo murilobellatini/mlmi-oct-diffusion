@@ -51,8 +51,6 @@ class TrainLoop:
         weight_decay=0.0,
         lr_anneal_steps=0,
         max_train_steps=None,
-        max_patience=1000,
-        early_stopping_on="loss",
     ):
         self.model = model
         self.diffusion = diffusion
@@ -94,11 +92,6 @@ class TrainLoop:
 
         self.last_model = None
         self.evaluator = None
-
-        self.max_patience = max_patience
-        self.patience = max_patience
-        self.early_stopping_on = early_stopping_on
-        self.early_stopping_best = float("inf")
 
         logger.log("Is CUDA available:", self.sync_cuda)
 
@@ -195,8 +188,8 @@ class TrainLoop:
     def run_loop(self, sampler_fn=None, sample_params=None):
         with tqdm(total=self.max_train_steps) as pbar:
             while (
-                (not self.lr_anneal_steps
-                or self.step + self.resume_step < self.lr_anneal_steps) and self.patience > 0
+                not self.lr_anneal_steps
+                or self.step + self.resume_step < self.lr_anneal_steps
             ):
                 batch, cond = next(self.data)
                 losses = self.run_step(batch, cond)
@@ -206,12 +199,6 @@ class TrainLoop:
                     valid_losses = self.forward_backward(valid_batch, valid_cond, True)
                     valid_losses = {f"valid_{k}": v for k, v in valid_losses.items()}
                     losses.update(valid_losses)
-
-                if losses[self.early_stopping_on] <= self.early_stopping_best:
-                    self.patience -= 1
-                else:
-                    self.patience = self.max_patience
-                    self.early_stopping_best = losses[self.early_stopping_on]
 
                 if self.step % self.log_interval == 0:
                     logger.dumpkvs()
@@ -264,8 +251,6 @@ class TrainLoop:
         # Save the last checkpoint if it wasn't already saved.
         if (self.step - 1) % self.save_interval != 0:
             self.save()
-        if self.patience == 0:
-            print("Early stopping finished the execution of the training")
 
     def run_step(self, batch, cond, is_valid=False):
         self.forward_backward(batch, cond, is_valid)
