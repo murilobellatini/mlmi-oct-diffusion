@@ -33,11 +33,10 @@ def prepare_kaggle_dataset(
                     dataset_name, data_dir
                 )
             )
-        except Exception as e:
+        except:
             print("Dataset was not sucessfully downloaded.")
-            print(e)
-            
-    dataset_dir = data_dir + "/kermany2018/OCT2017"
+    "/Users/sebastianrichstein/Documents/Master RCI/Semester 3/MLMI/mlmi-oct-diffusion/data/raw/kaggle/kermany2018"
+    dataset_dir = data_dir + "/kermany2018/OCT2017 "
     duplicate_dir = dataset_dir + "/duplicates"
     if not os.path.exists(duplicate_dir) and move_duplicates:
         os.mkdir(duplicate_dir)

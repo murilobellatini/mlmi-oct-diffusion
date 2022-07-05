@@ -1,22 +1,20 @@
 train:
   output_dir: "./model"
-  data_dir: "./data/raw/OCT2017/train"
-  valid_data_dir: "./data/raw/OCT2017/val"
+  data_dir: "./data/raw/oct"
+  valid_data_dir: "./data/raw/oct_test"
   schedule_sampler: uniform
   lr: 0.0001
   weight_decay: 0
   lr_anneal_steps: 0
   batch_size: 4
-  microbatch: 1
+  microbatch: -1
   ema_rate: '0.9999'
   log_interval: 10
   save_interval: 100
-  output_interval: 0
-  save_only_best_model: True
-  save_metric: loss
+  output_interval: 1000
   resume_checkpoint: ''
   fp16_scale_growth: 0.001
-  max_train_steps: 100000
+  max_train_steps: 40000
   reference_samples_path: "./KAGGLE_OCT_TEST_GT.npz"
 sample:
   clip_denoised: True
@@ -25,7 +23,7 @@ sample:
   use_ddim: False
   model_path: ""
 model:
-  image_size: 256
+  image_size: 128
   num_channels: 128
   num_res_blocks: 2
   num_heads: 4
