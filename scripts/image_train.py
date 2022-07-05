@@ -93,7 +93,7 @@ def main(params_file):
         max_train_steps=params["max_train_steps"],
         ref_batch_loc=params.get("reference_samples_path", None),
         save_only_best=params.get("save_only_best_model", False),
-        save_on=params.get("save_metric", None)
+        save_on=params.get("save_metric", None),
     ).run_loop(sample_images, sample_params)
 
 

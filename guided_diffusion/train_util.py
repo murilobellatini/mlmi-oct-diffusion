@@ -82,7 +82,9 @@ class TrainLoop:
         self.save_on = save_on
         self.best_metric = float("inf")
 
-        assert not save_only_best or save_on is not None, "Please give a save on metric for best only save"
+        assert (
+            not save_only_best or save_on is not None
+        ), "Please give a save on metric for best only save"
 
         self.ref_batch_loc = ref_batch_loc
 
@@ -195,9 +197,9 @@ class TrainLoop:
     def run_loop(self, sampler_fn=None, sample_params=None):
         with tqdm(total=self.max_train_steps) as pbar:
             while (
-                (not self.lr_anneal_steps
-                or self.step + self.resume_step < self.lr_anneal_steps) and self.patience > 0
-            ):
+                not self.lr_anneal_steps
+                or self.step + self.resume_step < self.lr_anneal_steps
+            ) and self.patience > 0:
                 batch, cond = next(self.data)
                 losses = self.run_step(batch, cond)
 
@@ -215,7 +217,9 @@ class TrainLoop:
 
                 if self.step % self.log_interval == 0:
                     logger.dumpkvs()
-                if (self.step % self.save_interval == 0) or (self.save_only_best and self.best_metric < losses[self.save_on]):
+                if (self.step % self.save_interval == 0) or (
+                    self.save_only_best and self.best_metric < losses[self.save_on]
+                ):
                     if self.save_only_best:
                         self.best_metric = losses[self.save_on]
                     self.save()
@@ -231,8 +235,14 @@ class TrainLoop:
                     and self.last_model is not None
                 ):
                     sample_params["model_path"] = self.last_model
-                    
-                    images, _ = sample_images(sample_params, model=self.model, diffusion=self.diffusion, micro=micro, t=t)
+
+                    images, _ = sample_images(
+                        sample_params,
+                        model=self.model,
+                        diffusion=self.diffusion,
+                        micro=micro,
+                        t=t,
+                    )
                     # images, _ = sample_images(sample_params)
                     self.model.train()
 
@@ -243,7 +253,7 @@ class TrainLoop:
                         },
                         step=self.step + self.resume_step,
                     )
-                    
+
                     wandb.log(
                         {
                             "examples": [
@@ -343,12 +353,16 @@ class TrainLoop:
             if dist.get_rank() == 0:
                 logger.log(f"saving model {rate}...")
                 if not rate:
-                    if self.save_only_best and not ((self.step - 1) % self.save_interval != 0): #Still save the last model
+                    if self.save_only_best and not (
+                        (self.step - 1) % self.save_interval != 0
+                    ):  # Still save the last model
                         filename = f"model.pt"
                     else:
                         filename = f"model{(self.step+self.resume_step):06d}.pt"
                 else:
-                    if self.save_only_best and not ((self.step - 1) % self.save_interval != 0): #Still save the last model
+                    if self.save_only_best and not (
+                        (self.step - 1) % self.save_interval != 0
+                    ):  # Still save the last model
                         filename = f"ema.pt"
                     else:
                         filename = f"ema_{rate}_{(self.step+self.resume_step):06d}.pt"

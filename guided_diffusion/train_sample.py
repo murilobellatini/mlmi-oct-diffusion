@@ -3,13 +3,21 @@ from guided_diffusion import dist_util, logger
 import torch as th
 import numpy as np
 import torch.distributed as dist
-from guided_diffusion.script_util import NUM_CLASSES, create_model_and_diffusion, model_and_diffusion_defaults
+from guided_diffusion.script_util import (
+    NUM_CLASSES,
+    create_model_and_diffusion,
+    model_and_diffusion_defaults,
+)
 
 
 def sample_images(params, model=None, diffusion=None, seq=False, micro=None, t=None):
     if model is None or diffusion is None:
         model, diffusion = create_model_and_diffusion(
-            **{k: params[k] for k in model_and_diffusion_defaults().keys() if k in params}
+            **{
+                k: params[k]
+                for k in model_and_diffusion_defaults().keys()
+                if k in params
+            }
         )
         model.load_state_dict(
             dist_util.load_state_dict(params["model_path"], seq=seq, map_location="cpu")
@@ -74,6 +82,7 @@ def sample_images(params, model=None, diffusion=None, seq=False, micro=None, t=N
         return arr, label_arr
     else:
         return arr, None
+
 
 def save_images(arr, label_arr, class_cond):
     if dist.get_rank() == 0:
