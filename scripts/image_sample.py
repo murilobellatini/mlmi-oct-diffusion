@@ -36,8 +36,7 @@ def main(params_file):
     params.update(params["diffusion"])
 
     wandb.login(key="f39476c0f8e0beb983d944d595be8f921ec05bfe")
-    wandb.init(project="OCT_DM_SAMPLE", entity="mlmioct22")
-    wandb.config = params
+    wandb.init(project="OCT_DM_SAMPLE", entity="mlmioct22", config=params)
 
     dist_util.setup_dist()
     logger.configure()
