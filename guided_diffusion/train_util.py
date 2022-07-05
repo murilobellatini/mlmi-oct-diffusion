@@ -328,12 +328,12 @@ class TrainLoop:
             if dist.get_rank() == 0:
                 logger.log(f"saving model {rate}...")
                 if not rate:
-                    if self.save_only_best:
+                    if self.save_only_best and not ((self.step - 1) % self.save_interval != 0): #Still save the last model
                         filename = f"model.pt"
                     else:
                         filename = f"model{(self.step+self.resume_step):06d}.pt"
                 else:
-                    if self.save_only_best:
+                    if self.save_only_best and not ((self.step - 1) % self.save_interval != 0): #Still save the last model
                         filename = f"ema.pt"
                     else:
                         filename = f"ema_{rate}_{(self.step+self.resume_step):06d}.pt"
