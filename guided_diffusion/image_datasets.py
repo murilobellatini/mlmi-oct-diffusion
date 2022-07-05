@@ -6,6 +6,7 @@ import blobfile as bf
 from mpi4py import MPI
 import numpy as np
 from torch.utils.data import DataLoader, Dataset
+from tqdm import tqdm
 
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
@@ -72,6 +73,12 @@ def load_data(
         loader = DataLoader(
             dataset, batch_size=batch_size, shuffle=True, num_workers=1, drop_last=True
         )
+
+    print("Data sanity check starting...")
+    it = iter(loader)
+    for _ in tqdm(range(len(loader))):
+        next(it)
+
     while True:
         yield from loader
 
@@ -129,4 +136,3 @@ class ImageDataset(Dataset):
         if self.local_classes is not None:
             out_dict["y"] = np.array(self.local_classes[idx], dtype=np.int64)
         return np.transpose(arr, [2, 0, 1]), out_dict
-
