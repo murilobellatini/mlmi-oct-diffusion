@@ -26,10 +26,17 @@ from guided_diffusion.train_sample import sample_images, save_images
 
 @click.command()
 @click.argument("params_file", type=click.File("r"))
-def main(params_file):
+@click.argument("model_path", type=str)
+def main(params_file, model_path):
     params = get_default_params_sample()
 
     params_file = yaml.safe_load(params_file)
+
+    assert os.path.isfile(
+        model_path
+    ), f"No file found in the {model_path} Path. Make sure to pass in a valid .pt file"
+
+    params["sample"]["model_path"] = model_path
 
     params.update(params["sample"])
     params.update(params["model"])
