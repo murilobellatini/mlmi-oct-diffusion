@@ -4,8 +4,14 @@ from tqdm import tqdm
 from hashlib import md5
 
 
-def prepare_kaggle_dataset(dataset_dir='/data/raw/kaggle', dataset_name='paultimothymooney/kermany2018', data_format='.jpeg', download=True, move_duplicates=True):
-    '''
+def prepare_kaggle_dataset(
+    dataset_dir="/data/raw/kaggle",
+    dataset_name="paultimothymooney/kermany2018",
+    data_format=".jpeg",
+    download=True,
+    move_duplicates=True,
+):
+    """
     Downloads kaggle dataset of OCT images to dataset_dir, if download flag is set to True. Removes duplicates to ensure unique samples in dataset.
     Input:
         -dataset_dir: Type String - Directory where to place downloaded dataset. Default is '/data/raw/kaggle'
@@ -15,27 +21,31 @@ def prepare_kaggle_dataset(dataset_dir='/data/raw/kaggle', dataset_name='paultim
         -move_duplicates: Type Boolean - Flag to print list of found duplicates to command line. Default is 'True'
     Output:
         Prints list of found duplicates
-    '''
+    """
     data_dir = os.path.abspath(os.getcwd() + dataset_dir)
     if not os.path.exists(data_dir):
         os.mkdir(data_dir)
     if download:
         try:
-            print('Downloading dataset...')
-            os.open('kaggle datasets download -d {} -p {} --unzip'.format(dataset_name, data_dir))
+            print("Downloading dataset...")
+            os.open(
+                "kaggle datasets download -d {} -p {} --unzip".format(
+                    dataset_name, data_dir
+                )
+            )
         except:
-            print('Dataset was not sucessfully downloaded.')
-    '/Users/sebastianrichstein/Documents/Master RCI/Semester 3/MLMI/mlmi-oct-diffusion/data/raw/kaggle/kermany2018'
-    dataset_dir = data_dir + '/kermany2018/OCT2017 '
-    duplicate_dir = dataset_dir + '/duplicates'
+            print("Dataset was not sucessfully downloaded.")
+    "/Users/sebastianrichstein/Documents/Master RCI/Semester 3/MLMI/mlmi-oct-diffusion/data/raw/kaggle/kermany2018"
+    dataset_dir = data_dir + "/kermany2018/OCT2017 "
+    duplicate_dir = dataset_dir + "/duplicates"
     if not os.path.exists(duplicate_dir) and move_duplicates:
         os.mkdir(duplicate_dir)
     # list of duplicates
     duplicates = []
-    duplicates.append(('Duplicate', 'Original file'))
+    duplicates.append(("Duplicate", "Original file"))
     hash_keys = dict()
     # walk throught dataset
-    print('Checking for duplicates')
+    print("Checking for duplicates")
     for root, dir, files in tqdm(os.walk(dataset_dir)):
         if not root == duplicate_dir:
             for file in files:
@@ -53,34 +63,36 @@ def prepare_kaggle_dataset(dataset_dir='/data/raw/kaggle', dataset_name='paultim
                             i = 0
                             while os.path.exists(os.path.join(duplicate_dir, file)):
                                 i += 1
-                                index = file.find('_copy_')
+                                index = file.find("_copy_")
                                 if index == -1:
-                                    new_file = file + '_copy_{}'.format(i)
+                                    new_file = file + "_copy_{}".format(i)
                                 else:
-                                    new_file = file[:index] + '_copy_{}'.format(i)
-                                os.rename(os.path.join(root, file), os.path.join(root, new_file))
+                                    new_file = file[:index] + "_copy_{}".format(i)
+                                os.rename(
+                                    os.path.join(root, file),
+                                    os.path.join(root, new_file),
+                                )
                                 file = new_file
                             shutil.move(os.path.join(root, file), duplicate_dir)
     return duplicates
 
 
 def file_hash(filepath):
-    with open(filepath, 'rb') as f:
+    with open(filepath, "rb") as f:
         return md5(f.read()).hexdigest()
 
 
 def main(print_duplicates=True):
-    print('Preparing kaggle OCT image dataset')
+    print("Preparing kaggle OCT image dataset")
     duplicates = prepare_kaggle_dataset(download=True)
     num_dupl = len(duplicates)
-    print('Processing finished. {} duplicates found.'.format(num_dupl))
+    print("Processing finished. {} duplicates found.".format(num_dupl))
     if num_dupl > 0 and print_duplicates:
-        print('Found duplicates:')
+        print("Found duplicates:")
         row = "{element1} | {element2}".format
         for tupel in duplicates:
             print(row(element1=tupel[0].ljust(20), element2=tupel[1].ljust(20)))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main(print_duplicates=True)
-

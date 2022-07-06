@@ -39,7 +39,7 @@ def compare_sample_images(ref_batch, sample_batch, evaluator=None):
             allow_soft_placement=True  # allows DecodeJpeg to run on CPU in Inception graph
         )
         config.gpu_options.allow_growth = True
-        
+
         evaluator = Evaluator(tf.Session(config=config))
 
         print("warming up TensorFlow...")
@@ -50,13 +50,17 @@ def compare_sample_images(ref_batch, sample_batch, evaluator=None):
     print("computing reference batch activations...")
     ref_acts = evaluator.read_activations(ref_batch)
     print("computing/reading reference batch statistics...")
-    
-    ref_stats, ref_stats_spatial = evaluator.read_statistics_from_file(ref_batch, ref_acts)
+
+    ref_stats, ref_stats_spatial = evaluator.read_statistics_from_file(
+        ref_batch, ref_acts
+    )
 
     print("computing sample batch activations...")
     sample_acts = evaluator.read_activations(sample_batch)
     print("computing/reading sample batch statistics...")
-    sample_stats, sample_stats_spatial = evaluator.read_statistics_from_file(sample_batch, sample_acts)
+    sample_stats, sample_stats_spatial = evaluator.read_statistics_from_file(
+        sample_batch, sample_acts
+    )
 
     incept_score = evaluator.compute_inception_score(sample_acts[0])
     fid = sample_stats.frechet_distance(ref_stats)
@@ -69,8 +73,16 @@ def compare_sample_images(ref_batch, sample_batch, evaluator=None):
     print("sFID:", sfid)
     print("Precision:", prec)
     print("Recall:", recall)
-    
-    wandb.log({"InceptionScore": incept_score, "FID": fid, "sFID": sfid, "precision": prec, "recall": recall})
+
+    wandb.log(
+        {
+            "InceptionScore": incept_score,
+            "FID": fid,
+            "sFID": sfid,
+            "precision": prec,
+            "recall": recall,
+        }
+    )
 
     return evaluator
 
@@ -144,7 +156,9 @@ class Evaluator:
         with self.sess.graph.as_default():
             self.image_input = tf.placeholder(tf.float32, shape=[None, None, None, 3])
             self.softmax_input = tf.placeholder(tf.float32, shape=[None, 2048])
-            self.pool_features, self.spatial_features = _create_feature_graph(self.image_input)
+            self.pool_features, self.spatial_features = _create_feature_graph(
+                self.image_input
+            )
             self.softmax = _create_softmax_graph(self.softmax_input)
 
     def warmup(self):
@@ -154,7 +168,9 @@ class Evaluator:
         with open_npz_array(npz_path, "arr_0") as reader:
             return self.compute_activations(reader.read_batches(self.batch_size))
 
-    def compute_activations(self, batches: Iterable[np.ndarray]) -> Tuple[np.ndarray, np.ndarray]:
+    def compute_activations(
+        self, batches: Iterable[np.ndarray]
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute image features for downstream evals.
 
@@ -191,11 +207,15 @@ class Evaluator:
         sigma = np.cov(activations, rowvar=False)
         return FIDStatistics(mu, sigma)
 
-    def compute_inception_score(self, activations: np.ndarray, split_size: int = 5000) -> float:
+    def compute_inception_score(
+        self, activations: np.ndarray, split_size: int = 5000
+    ) -> float:
         softmax_out = []
         for i in range(0, len(activations), self.softmax_batch_size):
             acts = activations[i : i + self.softmax_batch_size]
-            softmax_out.append(self.sess.run(self.softmax, feed_dict={self.softmax_input: acts}))
+            softmax_out.append(
+                self.sess.run(self.softmax, feed_dict={self.softmax_input: acts})
+            )
         preds = np.concatenate(softmax_out, axis=0)
         # https://github.com/openai/improved-gan/blob/4f5d1ec5c16a7eceb206f42bfc652693601e1d5c/inception_score/model.py#L46
         scores = []
@@ -285,7 +305,9 @@ class ManifoldEstimator:
             radii[begin1:end1, :] = np.concatenate(
                 [
                     x[:, self.nhood_sizes]
-                    for x in _numpy_partition(distance_batch[0 : end1 - begin1, :], seq, axis=1)
+                    for x in _numpy_partition(
+                        distance_batch[0 : end1 - begin1, :], seq, axis=1
+                    )
                 ],
                 axis=0,
             )
@@ -295,13 +317,17 @@ class ManifoldEstimator:
             radii[radii > max_distances] = 0
         return radii
 
-    def evaluate(self, features: np.ndarray, radii: np.ndarray, eval_features: np.ndarray):
+    def evaluate(
+        self, features: np.ndarray, radii: np.ndarray, eval_features: np.ndarray
+    ):
         """
         Evaluate if new feature vectors are at the manifold.
         """
         num_eval_images = eval_features.shape[0]
         num_ref_images = radii.shape[0]
-        distance_batch = np.zeros([self.row_batch_size, num_ref_images], dtype=np.float32)
+        distance_batch = np.zeros(
+            [self.row_batch_size, num_ref_images], dtype=np.float32
+        )
         batch_predictions = np.zeros([num_eval_images, self.num_nhoods], dtype=np.int32)
         max_realism_score = np.zeros([num_eval_images], dtype=np.float32)
         nearest_indices = np.zeros([num_eval_images], dtype=np.int32)
@@ -323,12 +349,16 @@ class ManifoldEstimator:
             # the new sample lies at the estimated manifold.
             # The radii of the hyperspheres are determined from distances of neighborhood size k.
             samples_in_manifold = distance_batch[0 : end1 - begin1, :, None] <= radii
-            batch_predictions[begin1:end1] = np.any(samples_in_manifold, axis=1).astype(np.int32)
+            batch_predictions[begin1:end1] = np.any(samples_in_manifold, axis=1).astype(
+                np.int32
+            )
 
             max_realism_score[begin1:end1] = np.max(
                 radii[:, 0] / (distance_batch[0 : end1 - begin1, :] + self.eps), axis=1
             )
-            nearest_indices[begin1:end1] = np.argmin(distance_batch[0 : end1 - begin1, :], axis=1)
+            nearest_indices[begin1:end1] = np.argmin(
+                distance_batch[0 : end1 - begin1, :], axis=1
+            )
 
         return {
             "fraction": float(np.mean(batch_predictions)),
@@ -395,7 +425,9 @@ class DistanceBlock:
             self.distance_block = tf.cond(
                 tf.reduce_all(tf.math.is_finite(distance_block_16)),
                 lambda: tf.cast(distance_block_16, tf.float32),
-                lambda: _batch_pairwise_distances(self._features_batch1, self._features_batch2),
+                lambda: _batch_pairwise_distances(
+                    self._features_batch1, self._features_batch2
+                ),
             )
 
             # Extra logic for less thans.
@@ -403,7 +435,9 @@ class DistanceBlock:
             self._radii2 = tf.placeholder(tf.float32, shape=[None, None])
             dist32 = tf.cast(self.distance_block, tf.float32)[..., None]
             self._batch_1_in = tf.math.reduce_any(dist32 <= self._radii2, axis=1)
-            self._batch_2_in = tf.math.reduce_any(dist32 <= self._radii1[:, None], axis=0)
+            self._batch_2_in = tf.math.reduce_any(
+                dist32 <= self._radii1[:, None], axis=0
+            )
 
     def pairwise_distances(self, U, V):
         """

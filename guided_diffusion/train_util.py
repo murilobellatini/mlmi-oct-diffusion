@@ -11,9 +11,9 @@ import torch.distributed as dist
 from torch.nn.parallel.distributed import DistributedDataParallel as DDP
 from torch.optim import AdamW
 import wandb
+from guided_diffusion.train_sample import sample_images, save_images
 
-from scripts.image_sample import save_images
-from evaluations.evaluator import compare_sample_images
+from guided_diffusion.evaluations.evaluator import compare_sample_images
 
 from . import dist_util, logger
 from .fp16_util import MixedPrecisionTrainer
@@ -40,6 +40,8 @@ class TrainLoop:
         log_interval,
         save_interval,
         resume_checkpoint,
+        save_only_best=False,
+        save_on=None,
         data_valid=None,
         output_interval=None,
         ref_batch_loc=None,
@@ -48,7 +50,9 @@ class TrainLoop:
         schedule_sampler=None,
         weight_decay=0.0,
         lr_anneal_steps=0,
-        max_train_steps=None
+        max_train_steps=None,
+        max_patience=1000,
+        early_stopping_on="loss",
     ):
         self.model = model
         self.diffusion = diffusion
@@ -62,6 +66,7 @@ class TrainLoop:
             if isinstance(ema_rate, float)
             else [float(x) for x in ema_rate.split(",")]
         )
+
         self.log_interval = log_interval
         self.save_interval = save_interval
         self.resume_checkpoint = resume_checkpoint
@@ -73,6 +78,14 @@ class TrainLoop:
         self.lr_anneal_steps = lr_anneal_steps
         self.max_train_steps = max_train_steps
 
+        self.save_only_best = save_only_best
+        self.save_on = save_on
+        self.best_metric = float("inf")
+
+        assert (
+            not save_only_best or save_on is not None
+        ), "Please give a save on metric for best only save"
+
         self.ref_batch_loc = ref_batch_loc
 
         self.step = 0
@@ -83,6 +96,11 @@ class TrainLoop:
 
         self.last_model = None
         self.evaluator = None
+
+        self.max_patience = max_patience
+        self.patience = max_patience
+        self.early_stopping_on = early_stopping_on
+        self.early_stopping_best = float("inf")
 
         logger.log("Is CUDA available:", self.sync_cuda)
 
@@ -125,7 +143,11 @@ class TrainLoop:
                     "Distributed training requires CUDA. "
                     "Gradients will not be synchronized properly!"
                 )
-                wandb.log(title="No CUDA Found", text= "Distributed training requires CUDA. Gradients will not be synchronized properly!", level=wandb.AlertLevel.WARN)
+                wandb.log(
+                    title="No CUDA Found",
+                    text="Distributed training requires CUDA. Gradients will not be synchronized properly!",
+                    level=wandb.AlertLevel.WARN,
+                )
             self.use_ddp = False
             self.ddp_model = self.model
 
@@ -133,11 +155,9 @@ class TrainLoop:
         resume_checkpoint = find_resume_checkpoint() or self.resume_checkpoint
 
         if resume_checkpoint:
-            self.resume_step = parse_resume_step_from_filename(
-                resume_checkpoint)
+            self.resume_step = parse_resume_step_from_filename(resume_checkpoint)
             if dist.get_rank() == 0:
-                logger.log(
-                    f"loading model from checkpoint: {resume_checkpoint}...")
+                logger.log(f"loading model from checkpoint: {resume_checkpoint}...")
                 self.model.load_state_dict(
                     dist_util.load_state_dict(
                         resume_checkpoint, map_location=dist_util.dev()
@@ -150,16 +170,14 @@ class TrainLoop:
         ema_params = copy.deepcopy(self.mp_trainer.master_params)
 
         main_checkpoint = find_resume_checkpoint() or self.resume_checkpoint
-        ema_checkpoint = find_ema_checkpoint(
-            main_checkpoint, self.resume_step, rate)
+        ema_checkpoint = find_ema_checkpoint(main_checkpoint, self.resume_step, rate)
         if ema_checkpoint:
             if dist.get_rank() == 0:
                 logger.log(f"loading EMA from checkpoint: {ema_checkpoint}...")
                 state_dict = dist_util.load_state_dict(
                     ema_checkpoint, map_location=dist_util.dev()
                 )
-                ema_params = self.mp_trainer.state_dict_to_master_params(
-                    state_dict)
+                ema_params = self.mp_trainer.state_dict_to_master_params(state_dict)
 
         dist_util.sync_params(ema_params)
         return ema_params
@@ -170,42 +188,85 @@ class TrainLoop:
             bf.dirname(main_checkpoint), f"opt{self.resume_step:06}.pt"
         )
         if bf.exists(opt_checkpoint):
-            logger.log(
-                f"loading optimizer state from checkpoint: {opt_checkpoint}")
+            logger.log(f"loading optimizer state from checkpoint: {opt_checkpoint}")
             state_dict = dist_util.load_state_dict(
                 opt_checkpoint, map_location=dist_util.dev()
             )
             self.opt.load_state_dict(state_dict)
 
-    def run_loop(self, sampler_fn = None, sample_params = None):
+    def run_loop(self, sampler_fn=None, sample_params=None):
         with tqdm(total=self.max_train_steps) as pbar:
             while (
                 not self.lr_anneal_steps
                 or self.step + self.resume_step < self.lr_anneal_steps
-            ):
+            ) and self.patience > 0:
                 batch, cond = next(self.data)
-                self.run_step(batch, cond)
+                losses = self.run_step(batch, cond)
 
                 if self.data_valid is not None:
                     valid_batch, valid_cond = next(self.data_valid)
-                    self.forward_backward(valid_batch, valid_cond, True)
+                    valid_losses = self.forward_backward(valid_batch, valid_cond, True)
+                    valid_losses = {f"valid_{k}": v for k, v in valid_losses.items()}
+                    losses.update(valid_losses)
+
+                if losses[self.early_stopping_on] <= self.early_stopping_best:
+                    self.patience -= 1
+                else:
+                    self.patience = self.max_patience
+                    self.early_stopping_best = losses[self.early_stopping_on]
 
                 if self.step % self.log_interval == 0:
                     logger.dumpkvs()
-                if self.step % self.save_interval == 0:
+                if (self.step % self.save_interval == 0) or (
+                    self.save_only_best and self.best_metric < losses[self.save_on]
+                ):
+                    if self.save_only_best:
+                        self.best_metric = losses[self.save_on]
                     self.save()
                     # Run for a finite amount of time in integration tests.
                     if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0:
                         return
-                if self.output_interval is not None and self.step % self.output_interval == 0 and sampler_fn is not None and sample_params is not None and self.last_model is not None:
+                if (
+                    self.output_interval is not None
+                    and self.output_interval > 0
+                    and self.step % self.output_interval == 0
+                    and sampler_fn is not None
+                    and sample_params is not None
+                    and self.last_model is not None
+                ):
                     sample_params["model_path"] = self.last_model
-                    images, _ = sampler_fn(sample_params)
-                    wandb.log({f"examples_{i}": wandb.Image(image) for i, image in enumerate(images)}, step=self.step + self.resume_step)
-                    wandb.log({"examples": [wandb.Image(image) for i, image in enumerate(images)]}, step=self.step + self.resume_step)
+
+                    images, _ = sample_images(
+                        sample_params,
+                        model=self.model,
+                        diffusion=self.diffusion,
+                        micro=micro,
+                        t=t,
+                    )
+                    # images, _ = sample_images(sample_params)
+                    self.model.train()
+
+                    wandb.log(
+                        {
+                            f"examples_{i}": wandb.Image(image)
+                            for i, image in enumerate(images)
+                        },
+                        step=self.step + self.resume_step,
+                    )
+
+                    wandb.log(
+                        {
+                            "examples": [
+                                wandb.Image(image) for i, image in enumerate(images)
+                            ]
+                        },
+                        step=self.step + self.resume_step,
+                    )
                     pred_loc = save_images(images, _, False)
                     if self.ref_batch_loc is not None:
-                        print("train_util", self.ref_batch_loc, pred_loc)
-                        self.evaluator = compare_sample_images(self.ref_batch_loc, pred_loc, self.evaluator)
+                        self.evaluator = compare_sample_images(
+                            self.ref_batch_loc, pred_loc, self.evaluator
+                        )
                 self.step += 1
                 pbar.update(1)
                 if self.step >= self.max_train_steps:
@@ -213,6 +274,8 @@ class TrainLoop:
         # Save the last checkpoint if it wasn't already saved.
         if (self.step - 1) % self.save_interval != 0:
             self.save()
+        if self.patience == 0:
+            print("Early stopping finished the execution of the training")
 
     def run_step(self, batch, cond, is_valid=False):
         self.forward_backward(batch, cond, is_valid)
@@ -225,14 +288,13 @@ class TrainLoop:
     def forward_backward(self, batch, cond, is_valid=False):
         self.mp_trainer.zero_grad()
         for i in range(0, batch.shape[0], self.microbatch):
-            micro = batch[i: i + self.microbatch].to(dist_util.dev())
+            micro = batch[i : i + self.microbatch].to(dist_util.dev())
             micro_cond = {
-                k: v[i: i + self.microbatch].to(dist_util.dev())
+                k: v[i : i + self.microbatch].to(dist_util.dev())
                 for k, v in cond.items()
             }
             last_batch = (i + self.microbatch) >= batch.shape[0]
-            t, weights = self.schedule_sampler.sample(
-                micro.shape[0], dist_util.dev())
+            t, weights = self.schedule_sampler.sample(micro.shape[0], dist_util.dev())
 
             compute_losses = functools.partial(
                 self.diffusion.training_losses,
@@ -255,10 +317,15 @@ class TrainLoop:
 
             loss = (losses["loss"] * weights).mean()
             log_loss_dict(
-                self.diffusion, t, {k: v * weights for k, v in losses.items()}, self.step + self.resume_step, is_valid
+                self.diffusion,
+                t,
+                {k: v * weights for k, v in losses.items()},
+                self.step + self.resume_step,
+                is_valid,
             )
             if not is_valid:
                 self.mp_trainer.backward(loss)
+        return losses
 
     def _update_ema(self):
         for rate, params in zip(self.ema_rate, self.ema_params):
@@ -274,8 +341,11 @@ class TrainLoop:
 
     def log_step(self):
         logger.logkv("step", self.step + self.resume_step, self.step + self.resume_step)
-        logger.logkv("samples", (self.step + self.resume_step + 1)
-                     * self.global_batch, self.step + self.resume_step)
+        logger.logkv(
+            "samples",
+            (self.step + self.resume_step + 1) * self.global_batch,
+            self.step + self.resume_step,
+        )
 
     def save(self):
         def save_checkpoint(rate, params):
@@ -283,9 +353,19 @@ class TrainLoop:
             if dist.get_rank() == 0:
                 logger.log(f"saving model {rate}...")
                 if not rate:
-                    filename = f"model{(self.step+self.resume_step):06d}.pt"
+                    if self.save_only_best and not (
+                        (self.step - 1) % self.save_interval != 0
+                    ):  # Still save the last model
+                        filename = f"model.pt"
+                    else:
+                        filename = f"model{(self.step+self.resume_step):06d}.pt"
                 else:
-                    filename = f"ema_{rate}_{(self.step+self.resume_step):06d}.pt"
+                    if self.save_only_best and not (
+                        (self.step - 1) % self.save_interval != 0
+                    ):  # Still save the last model
+                        filename = f"ema.pt"
+                    else:
+                        filename = f"ema_{rate}_{(self.step+self.resume_step):06d}.pt"
                 with bf.BlobFile(bf.join(get_blob_logdir(), filename), "wb") as f:
                     th.save(state_dict, f)
                     if "model" in filename:
@@ -297,8 +377,7 @@ class TrainLoop:
 
         if dist.get_rank() == 0:
             with bf.BlobFile(
-                bf.join(get_blob_logdir(),
-                        f"opt{(self.step+self.resume_step):06d}.pt"),
+                bf.join(get_blob_logdir(), f"opt{(self.step+self.resume_step):06d}.pt"),
                 "wb",
             ) as f:
                 th.save(self.opt.state_dict(), f)
@@ -349,4 +428,6 @@ def log_loss_dict(diffusion, ts, losses, step=None, is_valid=False):
         # Log the quantiles (four quartiles, in particular).
         for sub_t, sub_loss in zip(ts.cpu().numpy(), values.detach().cpu().numpy()):
             quartile = int(4 * sub_t / diffusion.num_timesteps)
-            logger.logkv_mean("valid_" * is_valid + f"{key}_q{quartile}", sub_loss, step)
+            logger.logkv_mean(
+                "valid_" * is_valid + f"{key}_q{quartile}", sub_loss, step
+            )
