@@ -6,6 +6,7 @@ import blobfile as bf
 from mpi4py import MPI
 import numpy as np
 from torch.utils.data import DataLoader, Dataset
+from tqdm import tqdm
 
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
@@ -49,11 +50,11 @@ def load_data(
         class_names = [bf.basename(path).split("_")[0] for path in all_files]
         sorted_classes = {x: i for i, x in enumerate(sorted(set(class_names)))}
         classes = [sorted_classes[x] for x in class_names]
-        
+
     transforms = []
     if random_crop:
         transforms.append(A.RandomCrop(height=image_size, width=image_size))
-        
+
     dataset = ImageDataset(
         image_size,
         all_files,
@@ -61,8 +62,7 @@ def load_data(
         shard=MPI.COMM_WORLD.Get_rank(),
         num_shards=MPI.COMM_WORLD.Get_size(),
         random_flip=random_flip,
-        transform = A.Compose(
-          transforms),
+        transform=A.Compose(transforms),
     )
     if deterministic:
         loader = DataLoader(
@@ -72,6 +72,12 @@ def load_data(
         loader = DataLoader(
             dataset, batch_size=batch_size, shuffle=True, num_workers=1, drop_last=True
         )
+
+    print("Data sanity check starting...")
+    it = iter(loader)
+    for _ in tqdm(range(len(loader))):
+        next(it)
+
     while True:
         yield from loader
 
@@ -97,7 +103,7 @@ class ImageDataset(Dataset):
         shard=0,
         num_shards=1,
         random_flip=True,
-        transform=None
+        transform=None,
     ):
         super().__init__()
         self.resolution = resolution
@@ -119,14 +125,13 @@ class ImageDataset(Dataset):
         if self.transform is not None:
             pil_image = self.transform(image=np.asarray(pil_image))["image"]
         arr = np.array(pil_image)
-        
+
         if self.random_flip and random.random() < 0.5:
             arr = arr[:, ::-1]
-        
+
         arr = arr.astype(np.float32) / 127.5 - 1
 
         out_dict = {}
         if self.local_classes is not None:
             out_dict["y"] = np.array(self.local_classes[idx], dtype=np.int64)
         return np.transpose(arr, [2, 0, 1]), out_dict
-

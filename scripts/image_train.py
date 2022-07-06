@@ -7,7 +7,8 @@ import wandb
 import yaml
 import click
 
-from guided_diffusion import dist_util, logger
+from guided_diffusion import dist_util
+from guided_diffusion import logger
 from guided_diffusion.image_datasets import load_data
 from guided_diffusion.resample import create_named_schedule_sampler
 from guided_diffusion.script_util import (
@@ -91,6 +92,8 @@ def main(params_file):
         lr_anneal_steps=params["lr_anneal_steps"],
         max_train_steps=params["max_train_steps"],
         ref_batch_loc=params.get("reference_samples_path", None),
+        save_only_best=params.get("save_only_best_model", False),
+        save_on=params.get("save_metric", None),
     ).run_loop(sample_images, sample_params)
 
 
