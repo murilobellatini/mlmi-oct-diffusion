@@ -205,7 +205,9 @@ class TrainLoop:
 
                 if self.data_valid is not None:
                     valid_batch, valid_cond = next(self.data_valid)
+                    self.model.eval()
                     valid_losses = self.forward_backward(valid_batch, valid_cond, True)
+                    self.model.train()
                     valid_losses = {f"valid_{k}": v for k, v in valid_losses.items()}
                     losses.update(valid_losses)
 
@@ -236,14 +238,7 @@ class TrainLoop:
                 ):
                     sample_params["model_path"] = self.last_model
 
-                    images, _ = sample_images(
-                        sample_params,
-                        model=self.model,
-                        diffusion=self.diffusion,
-                        micro=micro,
-                        t=t,
-                    )
-                    # images, _ = sample_images(sample_params)
+                    images, _ = sample_images(sample_params)
                     self.model.train()
 
                     wandb.log(
@@ -278,15 +273,17 @@ class TrainLoop:
             print("Early stopping finished the execution of the training")
 
     def run_step(self, batch, cond, is_valid=False):
-        self.forward_backward(batch, cond, is_valid)
+        losses = self.forward_backward(batch, cond, is_valid)
         took_step = self.mp_trainer.optimize(self.opt, self.step + self.resume_step)
         if took_step:
             self._update_ema()
         self._anneal_lr()
         self.log_step()
+        return losses
 
     def forward_backward(self, batch, cond, is_valid=False):
-        self.mp_trainer.zero_grad()
+        if not is_valid:
+            self.mp_trainer.zero_grad()
         for i in range(0, batch.shape[0], self.microbatch):
             micro = batch[i : i + self.microbatch].to(dist_util.dev())
             micro_cond = {
@@ -347,20 +344,24 @@ class TrainLoop:
             self.step + self.resume_step,
         )
 
-    def save(self):
+    def save(self, for_gen=False):
         def save_checkpoint(rate, params):
             state_dict = self.mp_trainer.master_params_to_state_dict(params)
             if dist.get_rank() == 0:
                 logger.log(f"saving model {rate}...")
                 if not rate:
-                    if self.save_only_best and not (
+                    if for_gen:
+                        filename = f"model_gen.pt"
+                    elif self.save_only_best and not (
                         (self.step - 1) % self.save_interval != 0
                     ):  # Still save the last model
                         filename = f"model.pt"
                     else:
                         filename = f"model{(self.step+self.resume_step):06d}.pt"
                 else:
-                    if self.save_only_best and not (
+                    if for_gen:
+                        filename = f"model_gen.pt"
+                    elif self.save_only_best and not (
                         (self.step - 1) % self.save_interval != 0
                     ):  # Still save the last model
                         filename = f"ema.pt"

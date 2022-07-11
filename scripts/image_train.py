@@ -21,8 +21,11 @@ from scripts.image_sample import get_default_params_sample, sample_images
 
 @click.command()
 @click.argument("params_file", type=click.File("r"))
-def main(params_file):
+@click.argument("gpu_index", type=int)
+def main(params_file, gpu_index):
     params_file = yaml.safe_load(params_file)
+
+    dist_util.GPU_INDEX = gpu_index
 
     params = get_default_params()
     params.update(params_file["train"])
