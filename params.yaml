@@ -40,7 +40,7 @@ model:
   use_new_attention_order: False
 diffusion:
   learn_sigma: True
-  diffusion_steps: 1000
+  diffusion_steps: 250
   noise_schedule: "linear"
   timestep_respacing: ""
   use_kl: False
