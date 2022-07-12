@@ -4,7 +4,9 @@ numpy array. This can be used to produce samples for FID evaluation.
 """
 
 import argparse
+from glob import glob
 import os
+from pathlib import Path
 import click
 
 import numpy as np
@@ -32,30 +34,34 @@ def main(params_file, model_path):
 
     params_file = yaml.safe_load(params_file)
 
-    assert os.path.isfile(
-        model_path
-    ), f"No file found in the {model_path} Path. Make sure to pass in a valid .pt file"
-
-    params["sample"]["model_path"] = model_path
-
-    params.update(params["sample"])
-    params.update(params["model"])
-    params.update(params["diffusion"])
+    params.update(params_file["sample"])
+    params.update(params_file["model"])
+    params.update(params_file["diffusion"])
 
     wandb.login(key="f39476c0f8e0beb983d944d595be8f921ec05bfe")
     wandb.init(project="OCT_DM_SAMPLE", entity="mlmioct22", config=params)
 
-    dist_util.setup_dist()
-    logger.configure()
+    for model_file_path in glob(model_path):
+        if not os.path.isfile(model_file_path):
+            logger.warn(
+                f"No file found in the {model_path} Path. Make sure to pass in a valid .pt file or a valid pattern"
+            )
+            continue
 
-    logger.log("creating model and diffusion...")
+        params["model_path"] = model_file_path
+        model_name = Path(model_file_path).stem
 
-    arr, label_arr = sample_images()
+        dist_util.setup_dist()
+        logger.configure()
 
-    save_images(arr, label_arr, params["class_cond"])
+        logger.log("creating model and diffusion...")
 
-    dist.barrier()
-    logger.log("sampling complete")
+        arr, label_arr = sample_images(params)
+
+        save_images(arr, label_arr, params["class_cond"], model_name)
+
+        dist.barrier()
+        logger.log(f"sampling complete for model {model_name}")
 
 
 def get_default_params_sample():
