@@ -16,3 +16,5 @@ mlmi-env/*
 *sandbox.py
 /outputs/*
 /model/*
+/wandb/*
+/model2/*

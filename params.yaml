@@ -1,7 +1,7 @@
 train:
   output_dir: "./model2"
-  data_dir: "./data/raw/OCT2017/train"
-  valid_data_dir: "./data/raw/OCT2017/val"
+  data_dir: "./data/raw/kaggle/kermany2018/OCT2017/train"
+  valid_data_dir: "./data/raw/kaggle/kermany2018/OCT2017/val"
   schedule_sampler: uniform
   lr: 0.0001
   weight_decay: 0

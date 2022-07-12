@@ -220,8 +220,8 @@ class TrainLoop:
 
                 if self.step % self.log_interval == 0:
                     logger.dumpkvs()
-                if (self.step % self.save_interval == 0) or (
-                    self.save_only_best and self.best_metric < losses[self.save_on]
+                if  (self.step % self.save_interval == 0) or ( 
+                    self.save_only_best and (self.best_metric < losses[self.save_on]) 
                 ):
                     if self.save_only_best:
                         self.best_metric = losses[self.save_on]
