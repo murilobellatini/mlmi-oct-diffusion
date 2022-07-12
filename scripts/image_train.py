@@ -61,7 +61,7 @@ def main(params_file, gpu_index, drop_data_val):
         batch_size=params["batch_size"],
         image_size=params["image_size"],
         class_cond=params["class_cond"],
-        validate_data=~drop_data_val,
+        validate_data=not drop_data_val,
     )
     if (
         params.get("valid_data_dir", None) is not None
@@ -72,7 +72,7 @@ def main(params_file, gpu_index, drop_data_val):
             batch_size=params["batch_size"],
             image_size=params["image_size"],
             class_cond=params["class_cond"],
-            validate_data=~drop_data_val,
+            validate_data=not drop_data_val,
         )
     else:
         data_valid = None
