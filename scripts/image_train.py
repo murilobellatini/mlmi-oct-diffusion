@@ -22,7 +22,8 @@ from scripts.image_sample import get_default_params_sample, sample_images
 @click.command()
 @click.argument("params_file", type=click.File("r"))
 @click.argument("gpu_index", type=int)
-def main(params_file, gpu_index):
+@click.option("data_val", is_flag=True, show_default=True, default=True, help="Add data validation")
+def main(params_file, gpu_index, data_val):
     params_file = yaml.safe_load(params_file)
 
     dist_util.GPU_INDEX = gpu_index
@@ -60,6 +61,7 @@ def main(params_file, gpu_index):
         batch_size=params["batch_size"],
         image_size=params["image_size"],
         class_cond=params["class_cond"],
+        data_val=data_val
     )
     if (
         params.get("valid_data_dir", None) is not None
@@ -70,6 +72,7 @@ def main(params_file, gpu_index):
             batch_size=params["batch_size"],
             image_size=params["image_size"],
             class_cond=params["class_cond"],
+            data_val=data_val
         )
     else:
         data_valid = None

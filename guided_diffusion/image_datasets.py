@@ -21,6 +21,7 @@ def load_data(
     deterministic=False,
     random_crop=True,
     random_flip=False,
+    data_val=True,
 ):
     """
     For a dataset, create a generator over (images, kwargs) pairs.
@@ -73,13 +74,14 @@ def load_data(
             dataset, batch_size=batch_size, shuffle=True, num_workers=1, drop_last=True
         )
 
-    print("Data sanity check starting...")
-    it = iter(loader)
-    for _ in tqdm(range(len(loader))):
-        next(it)
+    if data_val:
+        print("Data sanity check starting...")
+        it = iter(loader)
+        for _ in tqdm(range(len(loader))):
+            next(it)
 
-    while True:
-        yield from loader
+        while True:
+            yield from loader
 
 
 def _list_image_files_recursively(data_dir):
