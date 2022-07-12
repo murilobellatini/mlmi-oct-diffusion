@@ -22,7 +22,7 @@ from scripts.image_sample import get_default_params_sample, sample_images
 @click.command()
 @click.argument("params_file", type=click.File("r"))
 @click.argument("gpu_index", type=int)
-@click.option("data_val", is_flag=True, show_default=True, default=True, help="Add data validation")
+@click.option("--data_val", is_flag=True, show_default=True, default=True, help="Add data validation")
 def main(params_file, gpu_index, data_val):
     params_file = yaml.safe_load(params_file)
 
