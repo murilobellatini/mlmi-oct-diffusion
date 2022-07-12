@@ -220,14 +220,15 @@ class TrainLoop:
 
                 if self.step % self.log_interval == 0:
                     logger.dumpkvs()
-                if  (self.step % self.save_interval == 0) or ( 
-                    self.save_only_best and (self.best_metric < losses[self.save_on]) 
-                ):
-                    if self.save_only_best:
-                        self.best_metric = losses[self.save_on]
-                    self.save()
-                    # Run for a finite amount of time in integration tests.
-                    if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0:
+                if (self.save_only_best and (self.best_metric > losses[self.save_on])): 
+                    self.best_metric = losses[self.save_on] 
+                    self.save() 
+                    if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0: 
+                        return 
+                elif (self.step % self.save_interval == 0): 
+                    self.save() 
+                    # Run for a finite amount of time in integration tests. 
+                    if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0: 
                         return
                 if (
                     self.output_interval is not None
