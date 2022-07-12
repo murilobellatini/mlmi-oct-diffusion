@@ -21,8 +21,11 @@ from scripts.image_sample import get_default_params_sample, sample_images
 
 @click.command()
 @click.argument("params_file", type=click.File("r"))
-def main(params_file):
+@click.argument("gpu_index", type=int)
+def main(params_file, gpu_index):
     params_file = yaml.safe_load(params_file)
+
+    dist_util.GPU_INDEX = gpu_index
 
     params = get_default_params()
     params.update(params_file["train"])
@@ -94,6 +97,8 @@ def main(params_file):
         ref_batch_loc=params.get("reference_samples_path", None),
         save_only_best=params.get("save_only_best_model", False),
         save_on=params.get("save_metric", None),
+        max_patience=params.get("max_patience", 1000),
+        early_stopping_on=params.get("early_stopping_on", None),
     ).run_loop(sample_images, sample_params)
 
 
