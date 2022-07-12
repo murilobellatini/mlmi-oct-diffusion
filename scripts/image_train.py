@@ -97,6 +97,8 @@ def main(params_file, gpu_index):
         ref_batch_loc=params.get("reference_samples_path", None),
         save_only_best=params.get("save_only_best_model", False),
         save_on=params.get("save_metric", None),
+        max_patience=params.get("max_patience", 1000),
+        early_stopping_on=params.get("early_stopping_on", None),
     ).run_loop(sample_images, sample_params)
 
 

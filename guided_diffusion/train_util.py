@@ -211,11 +211,12 @@ class TrainLoop:
                     valid_losses = {f"valid_{k}": v for k, v in valid_losses.items()}
                     losses.update(valid_losses)
 
-                if losses[self.early_stopping_on] <= self.early_stopping_best:
-                    self.patience -= 1
-                else:
-                    self.patience = self.max_patience
-                    self.early_stopping_best = losses[self.early_stopping_on]
+                if self.early_stopping_on is not None:
+                    if losses[self.early_stopping_on] <= self.early_stopping_best:
+                        self.patience -= 1
+                    else:
+                        self.patience = self.max_patience
+                        self.early_stopping_best = losses[self.early_stopping_on]
 
                 if self.step % self.log_interval == 0:
                     logger.dumpkvs()

@@ -16,6 +16,10 @@ train:
   fp16_scale_growth: 0.001
   max_train_steps: 100000
   reference_samples_path: "./KAGGLE_OCT_TEST_GT.npz"
+  save_only_best_model: True
+  save_metric: loss
+  max_patience: 1000
+  #early_stopping_on: loss # To use early stoping, uncomment this line
 sample:
   clip_denoised: True
   num_samples: 8
