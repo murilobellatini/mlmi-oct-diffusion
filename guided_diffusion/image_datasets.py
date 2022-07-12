@@ -41,7 +41,6 @@ def load_data(
     :param random_crop: if True, randomly crop the images for augmentation.
     :param random_flip: if True, randomly flip the images for augmentation.
     """
-    print("validate_data", validate_data)
     
     if not data_dir:
         raise ValueError("unspecified data directory")
@@ -82,8 +81,8 @@ def load_data(
         for _ in tqdm(range(len(loader))):
             next(it)
 
-        while True:
-            yield from loader
+    while True:
+        yield from loader
 
 
 def _list_image_files_recursively(data_dir):
