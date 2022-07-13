@@ -12,7 +12,7 @@ train:
   log_interval: 10
   save_interval: 100
   output_interval: 100
-  resume_checkpoint: ''
+  resume_checkpoint: '/home/mlmi-kristina/mlmi-oct-diffusion/model2/model021500.pt'
   fp16_scale_growth: 0.001
   max_train_steps: 100000
   reference_samples_path: "./KAGGLE_OCT_TEST_GT.npz"
