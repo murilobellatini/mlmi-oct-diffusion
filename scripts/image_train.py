@@ -22,10 +22,16 @@ from scripts.image_sample import get_default_params_sample, sample_images
 @click.command()
 @click.argument("params_file", type=click.File("r"))
 @click.argument("gpu_index", type=int)
-@click.option("--drop_data_val", is_flag=True, show_default=True, default=False, help="Drops data validation")
+@click.option(
+    "--drop_data_val",
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help="Drops data validation",
+)
 def main(params_file, gpu_index, drop_data_val):
     params_file = yaml.safe_load(params_file)
-    
+
     dist_util.GPU_INDEX = gpu_index
 
     params = get_default_params()
@@ -86,6 +92,7 @@ def main(params_file, gpu_index, drop_data_val):
         batch_size=params["batch_size"],
         microbatch=params["microbatch"],
         lr=params["lr"],
+        lr_decay=params["lr_decay"],
         ema_rate=params["ema_rate"],
         log_interval=params["log_interval"],
         save_interval=params["save_interval"],
@@ -110,6 +117,7 @@ def get_default_params():
         data_dir="",
         schedule_sampler="uniform",
         lr=1e-4,
+        lr_decay=1.0,
         weight_decay=0.0,
         lr_anneal_steps=0,
         batch_size=1,
