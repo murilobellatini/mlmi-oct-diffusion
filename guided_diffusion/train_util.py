@@ -9,7 +9,7 @@ import blobfile as bf
 import torch as th
 import torch.distributed as dist
 from torch.nn.parallel.distributed import DistributedDataParallel as DDP
-from torch.optim import AdamW
+from torch.optim import AdamW, lr_scheduler
 import wandb
 from guided_diffusion.train_sample import sample_images, save_images
 
@@ -36,6 +36,7 @@ class TrainLoop:
         batch_size,
         microbatch,
         lr,
+        lr_decay,
         ema_rate,
         log_interval,
         save_interval,
@@ -61,6 +62,7 @@ class TrainLoop:
         self.batch_size = batch_size
         self.microbatch = microbatch if microbatch > 0 else batch_size
         self.lr = lr
+        self.lr_decay = lr_decay
         self.ema_rate = (
             [ema_rate]
             if isinstance(ema_rate, float)
@@ -114,6 +116,10 @@ class TrainLoop:
         self.opt = AdamW(
             self.mp_trainer.master_params, lr=self.lr, weight_decay=self.weight_decay
         )
+        self.lr_scheduler = lr_scheduler.ExponentialLR(
+            optimizer=self.opt, gamma=self.lr_decay
+        )
+
         if self.resume_step:
             self._load_optimizer_state()
             # Model was resumed, either due to a restart or a checkpoint
@@ -195,7 +201,7 @@ class TrainLoop:
             self.opt.load_state_dict(state_dict)
 
     def run_loop(self, sampler_fn=None, sample_params=None):
-        with tqdm(total=self.max_train_steps-self.resume_step) as pbar:
+        with tqdm(total=self.max_train_steps - self.resume_step) as pbar:
             while (
                 not self.lr_anneal_steps
                 or self.step + self.resume_step < self.lr_anneal_steps
@@ -220,12 +226,14 @@ class TrainLoop:
 
                 if self.step % self.log_interval == 0:
                     logger.dumpkvs()
-                if (self.save_only_best and (self.best_metric > losses[self.save_on].mean().item())):
+                if self.save_only_best and (
+                    self.best_metric > losses[self.save_on].mean().item()
+                ):
                     self.best_metric = losses[self.save_on].mean().item()
                     self.save(is_last=False)
                     if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0:
                         return
-                elif (self.step % self.save_interval == 0):
+                elif self.step % self.save_interval == 0:
                     self.save(is_last=False)
                     # Run for a finite amount of time in integration tests.
                     if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0:
@@ -281,6 +289,8 @@ class TrainLoop:
         if took_step:
             self._update_ema()
         self._anneal_lr()
+        if self.lr_anneal_steps == 0:
+            self.lr_scheduler.step()
         self.log_step()
         return losses
 
@@ -348,7 +358,9 @@ class TrainLoop:
         )
 
     def save(self, for_gen=False, is_last=False):
-        def save_checkpoint(rate, params, save_only_best=False, for_gen=False, is_last=False):
+        def save_checkpoint(
+            rate, params, save_only_best=False, for_gen=False, is_last=False
+        ):
             state_dict = self.mp_trainer.master_params_to_state_dict(params)
             if dist.get_rank() == 0:
                 logger.log(f"saving model {rate}...")
@@ -371,9 +383,21 @@ class TrainLoop:
                     if "model" in filename:
                         self.last_model = bf.join(get_blob_logdir(), filename)
 
-        save_checkpoint(0, self.mp_trainer.master_params, save_only_best=self.save_only_best, for_gen=for_gen, is_last=is_last)
+        save_checkpoint(
+            0,
+            self.mp_trainer.master_params,
+            save_only_best=self.save_only_best,
+            for_gen=for_gen,
+            is_last=is_last,
+        )
         for rate, params in zip(self.ema_rate, self.ema_params):
-            save_checkpoint(rate, params, save_only_best=self.save_only_best, for_gen=for_gen, is_last=is_last)
+            save_checkpoint(
+                rate,
+                params,
+                save_only_best=self.save_only_best,
+                for_gen=for_gen,
+                is_last=is_last,
+            )
 
         if dist.get_rank() == 0:
             opt_fname = f"opt{(self.step+self.resume_step):06d}.pt"
