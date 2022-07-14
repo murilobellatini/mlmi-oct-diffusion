@@ -93,6 +93,7 @@ def main(params_file, gpu_index, drop_data_val):
         microbatch=params["microbatch"],
         lr=params["lr"],
         lr_decay=params["lr_decay"],
+        lr_stepsize=params["lr_stepsize"],
         ema_rate=params["ema_rate"],
         log_interval=params["log_interval"],
         save_interval=params["save_interval"],
