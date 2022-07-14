@@ -37,6 +37,7 @@ class TrainLoop:
         microbatch,
         lr,
         lr_decay,
+        lr_stepsize,
         ema_rate,
         log_interval,
         save_interval,
@@ -63,6 +64,7 @@ class TrainLoop:
         self.microbatch = microbatch if microbatch > 0 else batch_size
         self.lr = lr
         self.lr_decay = lr_decay
+        self.lr_stepsize = lr_stepsize
         self.ema_rate = (
             [ema_rate]
             if isinstance(ema_rate, float)
@@ -116,8 +118,8 @@ class TrainLoop:
         self.opt = AdamW(
             self.mp_trainer.master_params, lr=self.lr, weight_decay=self.weight_decay
         )
-        self.lr_scheduler = lr_scheduler.ExponentialLR(
-            optimizer=self.opt, gamma=self.lr_decay
+        self.lr_scheduler = lr_scheduler.StepLR(
+            optimizer=self.opt, step_size=self.lr_stepsize, gamma=self.lr_decay
         )
 
         if self.resume_step:
