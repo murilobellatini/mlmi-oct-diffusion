@@ -195,7 +195,7 @@ class TrainLoop:
             self.opt.load_state_dict(state_dict)
 
     def run_loop(self, sampler_fn=None, sample_params=None):
-        with tqdm(total=self.max_train_steps) as pbar:
+        with tqdm(total=self.max_train_steps-self.resume_step) as pbar:
             while (
                 not self.lr_anneal_steps
                 or self.step + self.resume_step < self.lr_anneal_steps
@@ -220,12 +220,13 @@ class TrainLoop:
 
                 if self.step % self.log_interval == 0:
                     logger.dumpkvs()
-                if  (self.step % self.save_interval == 0) or ( 
-                    self.save_only_best and (self.best_metric < losses[self.save_on]) 
-                ):
-                    if self.save_only_best:
-                        self.best_metric = losses[self.save_on]
-                    self.save()
+                if (self.save_only_best and (self.best_metric > losses[self.save_on].mean().item())):
+                    self.best_metric = losses[self.save_on].mean().item()
+                    self.save(is_last=False)
+                    if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0:
+                        return
+                elif (self.step % self.save_interval == 0):
+                    self.save(is_last=False)
                     # Run for a finite amount of time in integration tests.
                     if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0:
                         return
@@ -237,6 +238,7 @@ class TrainLoop:
                     and sample_params is not None
                     and self.last_model is not None
                 ):
+                    self.save(for_gen=True)
                     sample_params["model_path"] = self.last_model
 
                     images, _ = sample_images(sample_params)
@@ -269,7 +271,7 @@ class TrainLoop:
                     break
         # Save the last checkpoint if it wasn't already saved.
         if (self.step - 1) % self.save_interval != 0:
-            self.save()
+            self.save(is_last=True)
         if self.patience == 0:
             print("Early stopping finished the execution of the training")
 
@@ -345,26 +347,22 @@ class TrainLoop:
             self.step + self.resume_step,
         )
 
-    def save(self, for_gen=False):
-        def save_checkpoint(rate, params):
+    def save(self, for_gen=False, is_last=False):
+        def save_checkpoint(rate, params, save_only_best=False, for_gen=False, is_last=False):
             state_dict = self.mp_trainer.master_params_to_state_dict(params)
             if dist.get_rank() == 0:
                 logger.log(f"saving model {rate}...")
                 if not rate:
                     if for_gen:
                         filename = f"model_gen.pt"
-                    elif self.save_only_best and not (
-                        (self.step - 1) % self.save_interval != 0
-                    ):  # Still save the last model
+                    elif save_only_best and not is_last:  # Still save the last model
                         filename = f"model.pt"
                     else:
                         filename = f"model{(self.step+self.resume_step):06d}.pt"
                 else:
                     if for_gen:
                         filename = f"model_gen.pt"
-                    elif self.save_only_best and not (
-                        (self.step - 1) % self.save_interval != 0
-                    ):  # Still save the last model
+                    elif save_only_best and not is_last:  # Still save the last model
                         filename = f"ema.pt"
                     else:
                         filename = f"ema_{rate}_{(self.step+self.resume_step):06d}.pt"
@@ -373,13 +371,18 @@ class TrainLoop:
                     if "model" in filename:
                         self.last_model = bf.join(get_blob_logdir(), filename)
 
-        save_checkpoint(0, self.mp_trainer.master_params)
+        save_checkpoint(0, self.mp_trainer.master_params, save_only_best=self.save_only_best, for_gen=for_gen, is_last=is_last)
         for rate, params in zip(self.ema_rate, self.ema_params):
-            save_checkpoint(rate, params)
+            save_checkpoint(rate, params, save_only_best=self.save_only_best, for_gen=for_gen, is_last=is_last)
 
         if dist.get_rank() == 0:
+            opt_fname = f"opt{(self.step+self.resume_step):06d}.pt"
+            if for_gen:
+                opt_fname = "opt_gen.pt"
+            elif self.save_only_best and not is_last:
+                opt_fname = "opt.pt"
             with bf.BlobFile(
-                bf.join(get_blob_logdir(), f"opt{(self.step+self.resume_step):06d}.pt"),
+                bf.join(get_blob_logdir(), opt_fname),
                 "wb",
             ) as f:
                 th.save(self.opt.state_dict(), f)

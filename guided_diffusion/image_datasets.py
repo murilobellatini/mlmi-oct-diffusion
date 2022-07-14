@@ -21,6 +21,7 @@ def load_data(
     deterministic=False,
     random_crop=True,
     random_flip=False,
+    validate_data=True,
 ):
     """
     For a dataset, create a generator over (images, kwargs) pairs.
@@ -40,6 +41,7 @@ def load_data(
     :param random_crop: if True, randomly crop the images for augmentation.
     :param random_flip: if True, randomly flip the images for augmentation.
     """
+    
     if not data_dir:
         raise ValueError("unspecified data directory")
     all_files = _list_image_files_recursively(data_dir)
@@ -73,10 +75,11 @@ def load_data(
             dataset, batch_size=batch_size, shuffle=True, num_workers=1, drop_last=True
         )
 
-    print("Data sanity check starting...")
-    it = iter(loader)
-    for _ in tqdm(range(len(loader))):
-        next(it)
+    if validate_data:
+        print("Data sanity check starting...")
+        it = iter(loader)
+        for _ in tqdm(range(len(loader))):
+            next(it)
 
     while True:
         yield from loader
