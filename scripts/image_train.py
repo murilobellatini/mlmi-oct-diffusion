@@ -117,7 +117,8 @@ def get_default_params():
         data_dir="",
         schedule_sampler="uniform",
         lr=1e-4,
-        lr_decay=1.0,
+        lr_decay=1.0,  # Default value for learning rate decay set to 1 to keep LR stable by default
+        lr_stepsize=10000,  # StepLR Scheduler with defined stepsize for decreasing learning rate
         weight_decay=0.0,
         lr_anneal_steps=0,
         batch_size=1,
