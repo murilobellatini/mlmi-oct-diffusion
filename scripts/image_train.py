@@ -70,6 +70,7 @@ def main(params_file, gpu_index, drop_data_val):
         image_size=params["image_size"],
         class_cond=params["class_cond"],
         resize_image=params["resize_image"],
+        resize_res=params["resize_res"],
         random_crop=params["random_crop"],
         validate_data=not drop_data_val,
     )
@@ -83,6 +84,7 @@ def main(params_file, gpu_index, drop_data_val):
             image_size=params["image_size"],
             class_cond=params["class_cond"],
             resize_image=params["resize_image"],
+            resize_res=params["resize_res"],
             random_crop=params["random_crop"],
             validate_data=not drop_data_val,
         )
