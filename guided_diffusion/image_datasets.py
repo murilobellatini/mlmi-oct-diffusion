@@ -46,7 +46,7 @@ def load_data(
     :param random_crop: if True, randomly crop the images for augmentation.
     :param random_flip: if True, randomly flip the images for augmentation.
     """
-    
+
     if not data_dir:
         raise ValueError("unspecified data directory")
     all_files = _list_image_files_recursively(data_dir)
@@ -60,7 +60,7 @@ def load_data(
 
     transforms = []
     if resize_image:
-        transforms.append(A.LongestMaxSize(max_size=resize_res))
+        transforms.append(A.SmallestMaxSize(max_size=resize_res))
     if random_crop:
         transforms.append(A.RandomCrop(height=image_size, width=image_size))
 
