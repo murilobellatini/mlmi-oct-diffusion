@@ -21,6 +21,10 @@ train:
   save_metric: loss
   max_patience: 1000
   #early_stopping_on: loss # To use early stoping, uncomment this line
+data:
+  resize_image: True
+  resize_res: 128
+  random_crop: True
 sample:
   clip_denoised: True
   num_samples: 8

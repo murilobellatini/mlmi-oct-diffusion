@@ -38,11 +38,13 @@ def main(params_file, gpu_index, drop_data_val):
     params.update(params_file["train"])
     params.update(params_file["model"])
     params.update(params_file["diffusion"])
+    params.update(params_file["data"])
 
     sample_params = get_default_params_sample()
     sample_params.update(params_file["sample"])
     sample_params.update(params_file["model"])
     sample_params.update(params_file["diffusion"])
+    sample_params.update(params_file["data"])
 
     wandb.login(key="f39476c0f8e0beb983d944d595be8f921ec05bfe")
     wandb.init(project="OCT_DM_TRAIN", entity="mlmioct22", config=params)
@@ -67,6 +69,8 @@ def main(params_file, gpu_index, drop_data_val):
         batch_size=params["batch_size"],
         image_size=params["image_size"],
         class_cond=params["class_cond"],
+        resize_image=params["resize_image"],
+        random_crop=params["random_crop"],
         validate_data=not drop_data_val,
     )
     if (
@@ -78,6 +82,8 @@ def main(params_file, gpu_index, drop_data_val):
             batch_size=params["batch_size"],
             image_size=params["image_size"],
             class_cond=params["class_cond"],
+            resize_image=params["resize_image"],
+            random_crop=params["random_crop"],
             validate_data=not drop_data_val,
         )
     else:

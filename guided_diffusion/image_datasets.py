@@ -19,6 +19,8 @@ def load_data(
     image_size,
     class_cond=False,
     deterministic=False,
+    resize_image=True,
+    resize_res=128,
     random_crop=True,
     random_flip=False,
     validate_data=True,
@@ -38,6 +40,9 @@ def load_data(
                        label. If classes are not available and this is true, an
                        exception will be raised.
     :param deterministic: if True, yield results in a deterministic order.
+    :param resize_image: if True, resize image preserving the ratio. The biggest
+                       dimension becomes resize_res.
+    :param resize_res: length of biggest dimension in pixels if resize_image.
     :param random_crop: if True, randomly crop the images for augmentation.
     :param random_flip: if True, randomly flip the images for augmentation.
     """
@@ -54,6 +59,8 @@ def load_data(
         classes = [sorted_classes[x] for x in class_names]
 
     transforms = []
+    if resize_image:
+        transforms.append(A.LongestMaxSize(max_size=resize_res))
     if random_crop:
         transforms.append(A.RandomCrop(height=image_size, width=image_size))
 
