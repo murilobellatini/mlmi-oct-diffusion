@@ -2,8 +2,14 @@ import io
 
 import blobfile as bf
 import torch as th
+import torch.distributed as dist
 
 GPU_INDEX = 0
+
+
+def setup_dist():
+    backend = "gloo" if not th.cuda.is_available() else "nccl"
+    dist.init_process_group(backend=backend, init_method="env://")
 
 
 def dev():

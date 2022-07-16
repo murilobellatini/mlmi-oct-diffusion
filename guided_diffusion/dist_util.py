@@ -10,7 +10,6 @@ import blobfile as bf
 from mpi4py import MPI
 import torch as th
 import torch.distributed as dist
-from zmq import device
 
 # Change this to reflect your cluster layout.
 # The GPU for a given rank is (rank % GPUS_PER_NODE).

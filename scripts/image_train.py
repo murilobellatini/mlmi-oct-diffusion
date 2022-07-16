@@ -49,7 +49,7 @@ def main(params_file, gpu_index, drop_data_val):
     wandb.login(key="f39476c0f8e0beb983d944d595be8f921ec05bfe")
     wandb.init(project="OCT_DM_TRAIN", entity="mlmioct22", config=params)
 
-    # dist_util.setup_dist()
+    seq_utils.setup_dist()
     logger.configure(dir=params_file["train"].get("output_dir", None), web_logger=True)
 
     logger.log("creating model and diffusion...")
