@@ -9,7 +9,8 @@ import socket
 import blobfile as bf
 from mpi4py import MPI
 import torch as th
-import torch.distributed as dist
+
+# import torch.distributed as dist
 
 # Change this to reflect your cluster layout.
 # The GPU for a given rank is (rank % GPUS_PER_NODE).
@@ -24,8 +25,8 @@ def setup_dist():
     """
     Setup a distributed process group.
     """
-    if dist.is_initialized():
-        return
+    # if dist.is_initialized():
+    #     return
     # os.environ["CUDA_VISIBLE_DEVICES"] = f"{MPI.COMM_WORLD.Get_rank() % GPUS_PER_NODE}"
 
     # comm = MPI.COMM_WORLD
