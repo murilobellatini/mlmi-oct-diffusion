@@ -12,6 +12,7 @@ def setup_dist():
     # comm = MPI.COMM_WORLD
     # os.environ["RANK"] = str(comm.rank)
     backend = "gloo" if not th.cuda.is_available() else "nccl"
+    os.environ["MASTER_ADDR"] = "localhost"
     os.environ["RANK"] = "0"
     os.environ["WORLD_SIZE"] = "1"
     dist.init_process_group(backend=backend, init_method="env://")
