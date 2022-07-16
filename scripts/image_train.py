@@ -7,7 +7,7 @@ import wandb
 import yaml
 import click
 
-from guided_diffusion import dist_util
+from guided_diffusion import seq_utils
 from guided_diffusion import logger
 from guided_diffusion.image_datasets import load_data
 from guided_diffusion.resample import create_named_schedule_sampler
@@ -32,7 +32,7 @@ from scripts.image_sample import get_default_params_sample, sample_images
 def main(params_file, gpu_index, drop_data_val):
     params_file = yaml.safe_load(params_file)
 
-    dist_util.GPU_INDEX = gpu_index
+    seq_utils.GPU_INDEX = gpu_index
 
     params = get_default_params()
     params.update(params_file["train"])
@@ -49,7 +49,7 @@ def main(params_file, gpu_index, drop_data_val):
     wandb.login(key="f39476c0f8e0beb983d944d595be8f921ec05bfe")
     wandb.init(project="OCT_DM_TRAIN", entity="mlmioct22", config=params)
 
-    dist_util.setup_dist()
+    # dist_util.setup_dist()
     logger.configure(dir=params_file["train"].get("output_dir", None), web_logger=True)
 
     logger.log("creating model and diffusion...")
@@ -58,7 +58,7 @@ def main(params_file, gpu_index, drop_data_val):
     model, diffusion = create_model_and_diffusion(
         **{k: params[k] for k in model_and_diffusion_defaults().keys() if k in params}
     )
-    model.to(dist_util.dev())
+    model.to(seq_utils.dev())
     schedule_sampler = create_named_schedule_sampler(
         params["schedule_sampler"], diffusion
     )

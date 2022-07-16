@@ -15,7 +15,7 @@ import torch.distributed as dist
 import wandb
 import yaml
 
-from guided_diffusion import dist_util, logger
+from guided_diffusion import seq_utils, logger
 from guided_diffusion.script_util import (
     NUM_CLASSES,
     model_and_diffusion_defaults,
@@ -51,7 +51,7 @@ def main(params_file, model_path):
         params["model_path"] = model_file_path
         model_name = Path(model_file_path).stem
 
-        dist_util.setup_dist()
+        # dist_util.setup_dist()
         logger.configure()
 
         logger.log("creating model and diffusion...")

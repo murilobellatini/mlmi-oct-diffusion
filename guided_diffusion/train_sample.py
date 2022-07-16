@@ -1,5 +1,5 @@
 import os
-from guided_diffusion import dist_util, logger
+from guided_diffusion import seq_utils, logger
 import torch as th
 import numpy as np
 import torch.distributed as dist
@@ -20,9 +20,9 @@ def sample_images(params, model=None, diffusion=None, seq=False, micro=None, t=N
             }
         )
         model.load_state_dict(
-            dist_util.load_state_dict(params["model_path"], map_location="cpu")
+            seq_utils.load_state_dict(params["model_path"], map_location="cpu")
         )
-        model.to(dist_util.dev())
+        model.to(seq_utils.dev())
 
         if params["use_fp16"]:
             model.convert_to_fp16()
@@ -38,7 +38,7 @@ def sample_images(params, model=None, diffusion=None, seq=False, micro=None, t=N
                 low=0,
                 high=NUM_CLASSES,
                 size=(params["batch_size"],),
-                device=dist_util.dev(),
+                device=seq_utils.dev(),
             )
             model_kwargs["y"] = classes
 

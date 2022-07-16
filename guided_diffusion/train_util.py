@@ -15,7 +15,7 @@ from guided_diffusion.train_sample import sample_images, save_images
 
 from guided_diffusion.evaluations.evaluator import compare_sample_images
 
-from . import dist_util, logger
+from . import seq_utils, logger
 from .fp16_util import MixedPrecisionTrainer
 from .nn import update_ema
 from .resample import LossAwareSampler, UniformSampler
@@ -139,8 +139,8 @@ class TrainLoop:
             self.use_ddp = True
             self.ddp_model = DDP(
                 self.model,
-                device_ids=[dist_util.dev()],
-                output_device=dist_util.dev(),
+                device_ids=[seq_utils.dev()],
+                output_device=seq_utils.dev(),
                 broadcast_buffers=False,
                 bucket_cap_mb=128,
                 find_unused_parameters=False,
@@ -167,12 +167,12 @@ class TrainLoop:
             if dist.get_rank() == 0:
                 logger.log(f"loading model from checkpoint: {resume_checkpoint}...")
                 self.model.load_state_dict(
-                    dist_util.load_state_dict(
-                        resume_checkpoint, map_location=dist_util.dev()
+                    seq_utils.load_state_dict(
+                        resume_checkpoint, map_location=seq_utils.dev()
                     )
                 )
 
-        dist_util.sync_params(self.model.parameters())
+        seq_utils.sync_params(self.model.parameters())
 
     def _load_ema_parameters(self, rate):
         ema_params = copy.deepcopy(self.mp_trainer.master_params)
@@ -182,12 +182,12 @@ class TrainLoop:
         if ema_checkpoint:
             if dist.get_rank() == 0:
                 logger.log(f"loading EMA from checkpoint: {ema_checkpoint}...")
-                state_dict = dist_util.load_state_dict(
-                    ema_checkpoint, map_location=dist_util.dev()
+                state_dict = seq_utils.load_state_dict(
+                    ema_checkpoint, map_location=seq_utils.dev()
                 )
                 ema_params = self.mp_trainer.state_dict_to_master_params(state_dict)
 
-        dist_util.sync_params(ema_params)
+        seq_utils.sync_params(ema_params)
         return ema_params
 
     def _load_optimizer_state(self):
@@ -197,8 +197,8 @@ class TrainLoop:
         )
         if bf.exists(opt_checkpoint):
             logger.log(f"loading optimizer state from checkpoint: {opt_checkpoint}")
-            state_dict = dist_util.load_state_dict(
-                opt_checkpoint, map_location=dist_util.dev()
+            state_dict = seq_utils.load_state_dict(
+                opt_checkpoint, map_location=seq_utils.dev()
             )
             self.opt.load_state_dict(state_dict)
 
@@ -300,13 +300,13 @@ class TrainLoop:
         if not is_valid:
             self.mp_trainer.zero_grad()
         for i in range(0, batch.shape[0], self.microbatch):
-            micro = batch[i : i + self.microbatch].to(dist_util.dev())
+            micro = batch[i : i + self.microbatch].to(seq_utils.dev())
             micro_cond = {
-                k: v[i : i + self.microbatch].to(dist_util.dev())
+                k: v[i : i + self.microbatch].to(seq_utils.dev())
                 for k, v in cond.items()
             }
             last_batch = (i + self.microbatch) >= batch.shape[0]
-            t, weights = self.schedule_sampler.sample(micro.shape[0], dist_util.dev())
+            t, weights = self.schedule_sampler.sample(micro.shape[0], seq_utils.dev())
 
             compute_losses = functools.partial(
                 self.diffusion.training_losses,
