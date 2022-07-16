@@ -1,5 +1,6 @@
 import io
 import os
+import socket
 
 import blobfile as bf
 import torch as th
@@ -15,6 +16,7 @@ def setup_dist():
     os.environ["MASTER_ADDR"] = "localhost"
     os.environ["RANK"] = "0"
     os.environ["WORLD_SIZE"] = "1"
+    os.environ["MASTER_PORT"] = str(_find_free_port())
     dist.init_process_group(backend=backend, init_method="env://")
 
 
@@ -36,3 +38,13 @@ def sync_params(params):
     Synchronize a sequence of Tensors across ranks from rank 0.
     """
     pass
+
+
+def _find_free_port():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind(("", 0))
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        return s.getsockname()[1]
+    finally:
+        s.close()
