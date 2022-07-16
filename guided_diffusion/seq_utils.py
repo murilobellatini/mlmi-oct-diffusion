@@ -31,10 +31,11 @@ def setup_dist():
     comm = MPI.COMM_WORLD
     backend = "gloo" if not th.cuda.is_available() else "nccl"
 
-    if backend == "gloo":
-        hostname = "localhost"
-    else:
-        hostname = socket.gethostbyname(socket.getfqdn())
+    hostname = "localhost"
+    # if backend == "gloo":
+    #     hostname = "localhost"
+    # else:
+    #     hostname = socket.gethostbyname(socket.getfqdn())
     os.environ["MASTER_ADDR"] = comm.bcast(hostname, root=0)
     os.environ["RANK"] = str(comm.rank)
     os.environ["WORLD_SIZE"] = str(comm.size)
