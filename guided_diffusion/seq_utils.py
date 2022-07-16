@@ -1,4 +1,5 @@
 import io
+import socket
 
 import blobfile as bf
 import torch as th
