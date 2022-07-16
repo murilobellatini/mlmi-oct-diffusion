@@ -4,14 +4,14 @@ import os
 import blobfile as bf
 import torch as th
 import torch.distributed as dist
-import mpi4py as MPI
+from mpi4py import MPI
 
 GPU_INDEX = 0
 
 
 def setup_dist():
-    comm = MPI.COMM_WORLD
-    os.environ["RANK"] = str(comm.rank)
+    # comm = MPI.COMM_WORLD
+    # os.environ["RANK"] = str(comm.rank)
     backend = "gloo" if not th.cuda.is_available() else "nccl"
     dist.init_process_group(backend=backend, init_method="env://")
 
