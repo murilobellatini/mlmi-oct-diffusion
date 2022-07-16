@@ -3,6 +3,7 @@ import io
 import blobfile as bf
 import torch as th
 import torch.distributed as dist
+import mpi4py as MPI
 
 GPU_INDEX = 0
 
