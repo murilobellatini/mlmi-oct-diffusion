@@ -201,7 +201,7 @@ class TrainLoop:
             self.opt.load_state_dict(state_dict)
 
     def run_loop(self, sampler_fn=None, sample_params=None):
-        with tqdm(total=self.max_train_steps - self.resume_step) as pbar:
+        with tqdm(total=self.max_train_steps - self.resume_step, smoothing=0) as pbar:
             while (
                 not self.lr_anneal_steps
                 or self.step + self.resume_step < self.lr_anneal_steps
