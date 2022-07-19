@@ -25,6 +25,7 @@ data:
   resize_image: True
   resize_res: 128
   random_crop: True
+  center_crop: False
 sample:
   clip_denoised: True
   num_samples: 8

@@ -72,6 +72,7 @@ def main(params_file, gpu_index, drop_data_val):
         resize_image=params["resize_image"],
         resize_res=params["resize_res"],
         random_crop=params["random_crop"],
+        center_crop=params["center_crop"],
         validate_data=not drop_data_val,
     )
     if (

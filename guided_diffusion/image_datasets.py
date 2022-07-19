@@ -22,6 +22,7 @@ def load_data(
     resize_image=True,
     resize_res=128,
     random_crop=True,
+    center_crop=False,
     random_flip=False,
     validate_data=True,
 ):
@@ -61,8 +62,13 @@ def load_data(
     transforms = []
     if resize_image:
         transforms.append(A.SmallestMaxSize(max_size=resize_res))
+
     if random_crop:
         transforms.append(A.RandomCrop(height=image_size, width=image_size))
+    elif center_crop:
+        transforms.append(A.CenterCrop(height=image_size, width=image_size))
+    else:
+        raise AttributeError("Please give a cropping mechanism")
 
     dataset = ImageDataset(
         image_size,
