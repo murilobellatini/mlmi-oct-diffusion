@@ -390,6 +390,7 @@ def create_gaussian_diffusion(
     sigma_small=False,
     noise_schedule="linear",
     use_kl=False,
+    use_l1=False,
     predict_xstart=False,
     rescale_timesteps=False,
     rescale_learned_sigmas=False,
@@ -400,6 +401,8 @@ def create_gaussian_diffusion(
         loss_type = gd.LossType.RESCALED_KL
     elif rescale_learned_sigmas:
         loss_type = gd.LossType.RESCALED_MSE
+    elif use_l1:
+        loss_type = gd.LossType.L1
     else:
         loss_type = gd.LossType.MSE
     if not timestep_respacing:

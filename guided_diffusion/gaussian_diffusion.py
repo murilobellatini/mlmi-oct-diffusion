@@ -10,6 +10,7 @@ import math
 
 import numpy as np
 import torch as th
+from torch.nn.functional import l1_loss
 
 from .nn import mean_flat
 from .losses import normal_kl, discretized_gaussian_log_likelihood
@@ -93,6 +94,7 @@ class LossType(enum.Enum):
     )  # use raw MSE loss (with RESCALED_KL when learning variances)
     KL = enum.auto()  # use the variational lower-bound
     RESCALED_KL = enum.auto()  # like KL, but rescale to estimate the full VLB
+    L1 = enum.auto()
 
     def is_vb(self):
         return self == LossType.KL or self == LossType.RESCALED_KL
@@ -773,7 +775,11 @@ class GaussianDiffusion:
             )["output"]
             if self.loss_type == LossType.RESCALED_KL:
                 terms["loss"] *= self.num_timesteps
-        elif self.loss_type == LossType.MSE or self.loss_type == LossType.RESCALED_MSE:
+        elif (
+            self.loss_type == LossType.MSE
+            or self.loss_type == LossType.RESCALED_MSE
+            or self.loss_type == LossType.L1
+        ):
             model_output = model(x_t, self._scale_timesteps(t), **model_kwargs)
 
             if self.model_var_type in [
@@ -806,11 +812,15 @@ class GaussianDiffusion:
                 ModelMeanType.EPSILON: noise,
             }[self.model_mean_type]
             assert model_output.shape == target.shape == x_start.shape
+            loss_to_use = "mse" if self.loss_typpe != LossType.L1 else "L1"
             terms["mse"] = mean_flat((target - model_output) ** 2)
+            terms["L1"] = mean_flat(
+                l1_loss(model_output, target, reduction="none")
+            )  # We need feature wise loss values, not the overall mean
             if "vb" in terms:
-                terms["loss"] = terms["mse"] + terms["vb"]
+                terms["loss"] = terms[loss_to_use] + terms["vb"]
             else:
-                terms["loss"] = terms["mse"]
+                terms["loss"] = terms[loss_to_use]
         else:
             raise NotImplementedError(self.loss_type)
 
