@@ -380,7 +380,7 @@ class TrainLoop:
                         filename = f"model{(self.step+self.resume_step):06d}.pt"
                 else:
                     if for_gen:
-                        filename = f"model_gen.pt"
+                        filename = f"ema_gen.pt"
                     elif save_only_best and not is_last:  # Still save the last model
                         filename = f"ema.pt"
                     else:
