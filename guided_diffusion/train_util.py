@@ -222,7 +222,7 @@ class TrainLoop:
                 if self.early_stopping_on is not None:
                     if (
                         losses[self.early_stopping_on].mean().item()
-                        <= self.early_stopping_best
+                        >= self.early_stopping_best
                     ):
                         self.patience -= 1
                     else:
@@ -282,7 +282,7 @@ class TrainLoop:
                         )
                 self.step += 1
                 pbar.update(1)
-                if self.step >= self.max_train_steps:
+                if self.step + self.resume_step >= self.max_train_steps:
                     break
         # Save the last checkpoint if it wasn't already saved.
         if (self.step - 1) % self.save_interval != 0:
