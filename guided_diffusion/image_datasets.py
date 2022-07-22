@@ -52,6 +52,7 @@ def load_data(
     if not data_dir:
         raise ValueError("unspecified data directory")
     all_files = _list_image_files_recursively(data_dir, only_squares=only_square)
+    print("Number of files found: ", len(all_files))
     classes = None
     if class_cond:
         # Assume classes are the first part of the filename,
@@ -107,7 +108,7 @@ def _list_image_files_recursively(data_dir, only_squares=False):
         if "." in entry and ext.lower() in ["jpg", "jpeg", "png", "gif"]:
             if only_squares:
                 img = Image.open(full_path)
-                if img.width * 2 > img.height and img.width / 2 < img.height:
+                if img.width * 1.5 > img.height and img.width / 1.5 < img.height:
                     results.append(full_path)
             else:
                 results.append(full_path)
