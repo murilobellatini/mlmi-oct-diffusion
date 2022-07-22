@@ -11,7 +11,8 @@ import torch.distributed as dist
 from torch.nn.parallel.distributed import DistributedDataParallel as DDP
 from torch.optim import AdamW, lr_scheduler
 import wandb
-from guided_diffusion.train_sample import sample_images, save_images
+from guided_diffusion.train_sample import sample_images
+from guided_diffusion.img_utils import save_images
 
 from guided_diffusion.evaluations.evaluator import compare_sample_images
 

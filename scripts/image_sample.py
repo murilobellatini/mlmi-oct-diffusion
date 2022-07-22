@@ -23,13 +23,21 @@ from guided_diffusion.script_util import (
     add_dict_to_argparser,
     args_to_dict,
 )
-from guided_diffusion.train_sample import sample_images, save_images
+from guided_diffusion.train_sample import sample_images
+from guided_diffusion.img_utils import save_images
 
 
 @click.command()
 @click.argument("params_file", type=click.File("r"))
 @click.argument("model_path", type=str)
-def main(params_file, model_path):
+@click.option(
+    "--output_steps",
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help="Saves each diff step output",
+)
+def main(params_file, model_path, output_steps):
     params = get_default_params_sample()
 
     params_file = yaml.safe_load(params_file)
@@ -56,7 +64,7 @@ def main(params_file, model_path):
 
         logger.log("creating model and diffusion...")
 
-        arr, label_arr = sample_images(params)
+        arr, label_arr = sample_images(params, output_steps=output_steps)
 
         save_images(arr, label_arr, params["class_cond"], model_name)
 

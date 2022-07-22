@@ -10,7 +10,7 @@ from guided_diffusion.script_util import (
 )
 
 
-def sample_images(params, model=None, diffusion=None, seq=False, micro=None, t=None):
+def sample_images(params, model=None, diffusion=None, output_steps=False):
     if model is None or diffusion is None:
         model, diffusion = create_model_and_diffusion(
             **{
@@ -53,6 +53,7 @@ def sample_images(params, model=None, diffusion=None, seq=False, micro=None, t=N
             (params["batch_size"], 3, params["image_size"], params["image_size"]),
             clip_denoised=params["clip_denoised"],
             model_kwargs=model_kwargs,
+            output_steps=output_steps,
         )
         sample = ((sample + 1) * 127.5).clamp(0, 255).to(th.uint8)
         sample = sample.permute(0, 2, 3, 1)
@@ -79,18 +80,3 @@ def sample_images(params, model=None, diffusion=None, seq=False, micro=None, t=N
         return arr, label_arr
     else:
         return arr, None
-
-
-def save_images(arr, label_arr, class_cond, model_name=""):
-    if dist.get_rank() == 0:
-        shape_str = "x".join([str(x) for x in arr.shape])
-        out_path = os.path.join(
-            logger.get_dir(),
-            f"samples_{shape_str + '_' * (len(model_name) > 0) + model_name}.npz",
-        )
-        logger.log(f"saving to {out_path}")
-        if class_cond:
-            np.savez(out_path, arr, label_arr)
-        else:
-            np.savez(out_path, arr)
-        return out_path
