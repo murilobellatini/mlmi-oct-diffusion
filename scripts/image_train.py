@@ -29,7 +29,14 @@ from scripts.image_sample import get_default_params_sample, sample_images
     default=False,
     help="Drops data validation",
 )
-def main(params_file, gpu_index, drop_data_val):
+@click.option(
+    "--only_square",
+    is_flag=True,
+    show_default=True,
+    default=False,
+    help="Drops data validation",
+)
+def main(params_file, gpu_index, drop_data_val, only_square):
     params_file = yaml.safe_load(params_file)
 
     dist_util.GPU_INDEX = gpu_index
@@ -74,6 +81,7 @@ def main(params_file, gpu_index, drop_data_val):
         random_crop=params["random_crop"],
         center_crop=params["center_crop"],
         validate_data=not drop_data_val,
+        only_square=only_square,
     )
     if (
         params.get("valid_data_dir", None) is not None
@@ -89,6 +97,7 @@ def main(params_file, gpu_index, drop_data_val):
             random_crop=params["random_crop"],
             center_crop=params["center_crop"],
             validate_data=not drop_data_val,
+            only_square=only_square,
         )
     else:
         data_valid = None
