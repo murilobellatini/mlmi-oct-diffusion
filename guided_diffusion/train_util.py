@@ -232,7 +232,7 @@ class TrainLoop:
                             losses[self.early_stopping_on].mean().item()
                         )
 
-                if self.step % self.log_interval == 0:
+                if (self.step + self.resume_step) % self.log_interval == 0:
                     logger.dumpkvs()
                 if self.save_only_best and (
                     self.best_metric > losses[self.save_on].mean().item()
@@ -241,7 +241,7 @@ class TrainLoop:
                     self.save(is_last=False)
                     if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0:
                         return
-                elif self.step % self.save_interval == 0:
+                elif (self.step + self.resume_step) % self.save_interval == 0:
                     self.save(is_last=False)
                     # Run for a finite amount of time in integration tests.
                     if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0:
