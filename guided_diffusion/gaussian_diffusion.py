@@ -12,6 +12,8 @@ import numpy as np
 import torch as th
 from torch.nn.functional import l1_loss
 
+from guided_diffusion.img_utils import save_images
+
 from .nn import mean_flat
 from .losses import normal_kl, discretized_gaussian_log_likelihood
 
@@ -451,6 +453,7 @@ class GaussianDiffusion:
         model_kwargs=None,
         device=None,
         progress=False,
+        output_steps=False,
     ):
         """
         Generate samples from the model.
@@ -482,6 +485,7 @@ class GaussianDiffusion:
             model_kwargs=model_kwargs,
             device=device,
             progress=progress,
+            output_steps=output_steps,
         ):
             final = sample
         return final["sample"]
@@ -497,6 +501,7 @@ class GaussianDiffusion:
         model_kwargs=None,
         device=None,
         progress=False,
+        output_steps=False,
     ):
         """
         Generate samples from the model and yield intermediate samples from
@@ -535,6 +540,9 @@ class GaussianDiffusion:
                 )
                 yield out
                 img = out["sample"]
+
+                if output_steps:
+                    save_images(out, None, False, f"diff_{i}")
 
     def ddim_sample(
         self,
