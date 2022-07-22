@@ -25,6 +25,7 @@ def load_data(
     center_crop=False,
     random_flip=False,
     validate_data=True,
+    only_square=False,
 ):
     """
     For a dataset, create a generator over (images, kwargs) pairs.
@@ -50,7 +51,7 @@ def load_data(
 
     if not data_dir:
         raise ValueError("unspecified data directory")
-    all_files = _list_image_files_recursively(data_dir)
+    all_files = _list_image_files_recursively(data_dir, only_squares=only_square)
     classes = None
     if class_cond:
         # Assume classes are the first part of the filename,
@@ -98,13 +99,18 @@ def load_data(
         yield from loader
 
 
-def _list_image_files_recursively(data_dir):
+def _list_image_files_recursively(data_dir, only_squares=False):
     results = []
     for entry in sorted(bf.listdir(data_dir)):
         full_path = bf.join(data_dir, entry)
         ext = entry.split(".")[-1]
         if "." in entry and ext.lower() in ["jpg", "jpeg", "png", "gif"]:
-            results.append(full_path)
+            if only_squares:
+                img = Image.open(full_path)
+                if img.width * 2 > img.height and img.width / 2 < img.height:
+                    results.append(full_path)
+            else:
+                results.append(full_path)
         elif bf.isdir(full_path):
             results.extend(_list_image_files_recursively(full_path))
     return results
