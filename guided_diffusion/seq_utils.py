@@ -6,8 +6,6 @@ import blobfile as bf
 import torch as th
 import torch.distributed as dist
 
-GPU_INDEX = 0
-
 
 def setup_dist():
     # comm = MPI.COMM_WORLD
@@ -22,7 +20,7 @@ def setup_dist():
 
 def dev():
     if th.cuda.is_available():
-        return th.device(f"cuda:{str(GPU_INDEX)}")
+        return th.device("cuda")
     return th.device("cpu")
 
 
