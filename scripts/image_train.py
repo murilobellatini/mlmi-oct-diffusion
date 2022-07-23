@@ -21,7 +21,6 @@ from scripts.image_sample import get_default_params_sample, sample_images
 
 @click.command()
 @click.argument("params_file", type=click.File("r"))
-@click.argument("gpu_index", type=int)
 @click.option(
     "--drop_data_val",
     is_flag=True,
@@ -36,10 +35,8 @@ from scripts.image_sample import get_default_params_sample, sample_images
     default=False,
     help="Drops data validation",
 )
-def main(params_file, gpu_index, drop_data_val, only_square):
+def main(params_file, drop_data_val, only_square):
     params_file = yaml.safe_load(params_file)
-
-    seq_utils.GPU_INDEX = gpu_index
 
     params = get_default_params()
     params.update(params_file["train"])

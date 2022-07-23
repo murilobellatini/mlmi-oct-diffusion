@@ -17,8 +17,6 @@ GPUS_PER_NODE = 8
 
 SETUP_RETRY_COUNT = 3
 
-GPU_INDEX = 0
-
 
 def setup_dist():
     """
@@ -49,7 +47,7 @@ def dev():
     Get the device to use for torch.distributed.
     """
     if th.cuda.is_available():
-        return th.device(f"cuda:{str(GPU_INDEX)}")
+        return th.device(f"cuda")
     return th.device("cpu")
 
 
