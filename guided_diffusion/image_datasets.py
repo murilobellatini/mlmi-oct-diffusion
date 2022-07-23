@@ -113,7 +113,9 @@ def _list_image_files_recursively(data_dir, only_squares=False):
             else:
                 results.append(full_path)
         elif bf.isdir(full_path):
-            results.extend(_list_image_files_recursively(full_path))
+            results.extend(
+                _list_image_files_recursively(full_path, only_squares=only_squares)
+            )
     return results
 
 
