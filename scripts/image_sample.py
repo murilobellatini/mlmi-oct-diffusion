@@ -39,7 +39,6 @@ from guided_diffusion.img_utils import save_images
 )
 def main(params_file, model_path, output_steps):
     params = get_default_params_sample()
-
     params_file = yaml.safe_load(params_file)
 
     params.update(params_file["sample"])
