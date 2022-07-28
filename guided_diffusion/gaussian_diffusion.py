@@ -542,7 +542,10 @@ class GaussianDiffusion:
                 img = out["sample"]
 
                 if output_steps:
-                    save_images(out, None, False, f"diff_{i}")
+                    step_sample = ((img + 1) * 127.5).clamp(0, 255).to(th.uint8)
+                    step_sample = step_sample.permute(0, 2, 3, 1)
+                    step_sample = step_sample.contiguous()
+                    save_images(step_sample.cpu().numpy(), None, False, f"diff_{i}")
 
     def ddim_sample(
         self,
