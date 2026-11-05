@@ -1,5 +1,9 @@
 # MLMI Practical Course: OCT Image Generation via Diffusion Models
 
+> Practical course project at TUM, summer 2022.
+> Diffusion models applied to OCT eye scans.
+> Notebooks and model card inside.
+
 Repository for OCT Project MLMI Practical Course from Summer Semester 2022 at TUM.
 
 Current code is an extension of [guided-diffusion](https://github.com/openai/guided-diffusion).
